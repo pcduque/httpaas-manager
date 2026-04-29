@@ -2,152 +2,66 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>HAProxy Manager</title>
+    <title>HTTPaaS Manager</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            background: #f4f6f8;
             margin: 20px;
-            background: #f5f5f5;
         }
+
         h1, h2 {
-            color: #333;
+            color: #222;
         }
-        input, button, select {
-            margin: 5px;
-            padding: 8px;
-        }
+
         .card {
             background: white;
-            padding: 15px;
+            padding: 18px;
             margin-bottom: 20px;
             border-radius: 8px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            box-shadow: 0 1px 4px rgba(0,0,0,.1);
         }
+
+        input, button {
+            padding: 8px;
+            margin: 5px;
+        }
+
         pre {
             background: #111;
-            color: #0f0;
-            padding: 10px;
+            color: #00ff66;
+            padding: 12px;
             border-radius: 6px;
-            overflow-x: auto;
             white-space: pre-wrap;
+            overflow-x: auto;
         }
-        .row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-        .row input, .row select {
-            flex: 1;
-            min-width: 180px;
+
+        a {
+            color: #0b65c2;
+            font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-<h1>HAProxy Manager</h1>
+<h1>HTTPaaS Manager</h1>
 
 <div class="card">
-    <h2>Crear Balanceador</h2>
-    <div class="row">
-        <input id="b_name" placeholder="Nombre">
-        <input id="b_ip" placeholder="IP">
-        <input id="b_port" placeholder="Puerto (ej: 80)">
-    </div>
-    <button onclick="createBalancer()">Crear</button>
+    <h2>Publicar nueva página o aplicación web</h2>
+
+    <input id="host_name" placeholder="Nombre del host (ej: paisajes)">
+    <input id="site_zip" type="file" accept=".zip">
+
+    <button onclick="createInstance()">Publicar</button>
+
+    <pre id="create_result"></pre>
 </div>
 
 <div class="card">
-    <h2>Agregar Servidor</h2>
-    <div class="row">
-        <input id="s_balancer" placeholder="Balancer ID">
-        <input id="s_name" placeholder="Nombre">
-        <input id="s_ip" placeholder="IP">
-        <input id="s_port" placeholder="Puerto">
-    </div>
-    <button onclick="createServer()">Agregar</button>
-</div>
-
-<div class="card">
-    <h2>Aplicar Configuración HAProxy</h2>
-    <button onclick="applyConfig()">Aplicar HAProxy</button>
-    <pre id="apply_result"></pre>
-</div>
-
-<div class="card">
-    <h2>Ver Balanceadores</h2>
-    <button onclick="loadBalancers()">Cargar</button>
-    <pre id="balancers"></pre>
-</div>
-
-<div class="card">
-    <h2>Ver Servidores</h2>
-    <div class="row">
-        <input id="filter_id" placeholder="Balancer ID">
-    </div>
-    <button onclick="loadServers()">Cargar</button>
-    <pre id="servers"></pre>
-</div>
-
-<div class="card">
-    <h2>Configuración de Elasticidad Automática</h2>
-    <div class="row">
-        <select id="a_enabled">
-            <option value="true">Habilitado</option>
-            <option value="false">Deshabilitado</option>
-        </select>
-        <input id="a_balancer_id" placeholder="Balancer ID">
-        <input id="a_ssh_user" placeholder="SSH User (ej: server1)">
-    </div>
-    <div class="row">
-        <input id="a_high_threshold" placeholder="Umbral alto CPU (%)">
-        <input id="a_low_threshold" placeholder="Umbral bajo CPU (%)">
-        <input id="a_sample_seconds" placeholder="Frecuencia muestreo (s)">
-    </div>
-    <div class="row">
-        <input id="a_sustain_seconds" placeholder="Tiempo sostenido (s)">
-        <input id="a_min_instances" placeholder="Mínimo instancias">
-        <input id="a_max_instances" placeholder="Máximo instancias">
-    </div>
-    <div class="row">
-        <input id="a_template_vm_name" placeholder="Nombre VM plantilla">
-        <input id="a_base_disk_name_prefix" placeholder="Prefijo discos/VMs auto">
-        <input id="a_app_port" placeholder="Puerto app (ej: 8084)">
-    </div>
-    <div class="row">
-        <input id="a_available_hosts" placeholder="Hosts disponibles separados por coma (ej: 192.168.1.9,192.168.1.10)">
-    </div>
-    <button onclick="saveAutoScaleConfig()">Guardar Configuración</button>
-    <button onclick="loadAutoScaleConfig()">Cargar Configuración</button>
-    <pre id="autoscale_config_result"></pre>
-</div>
-
-<div class="card">
-    <h2>Estado del Autoscaling</h2>
-    <button onclick="loadAutoScaleState()">Ver Estado</button>
-    <button onclick="checkAutoScale()">Ejecutar Chequeo Manual</button>
-    <button onclick="startAutoScale()">Iniciar Autoscaling</button>
-    <button onclick="stopAutoScale()">Detener Autoscaling</button>
-    <pre id="autoscale_state"></pre>
-</div>
-
-<div class="card">
-    <h2>Simulación de Carga con stress-ng</h2>
-    <div class="row">
-        <input id="stress_host" placeholder="IP del servidor (ej: 192.168.1.7)">
-        <input id="stress_user" placeholder="SSH User (ej: server1)">
-        <input id="stress_cpu" placeholder="CPU workers (ej: 2)">
-        <input id="stress_timeout" placeholder="Duración en segundos (ej: 60)">
-    </div>
-    <button onclick="startStress()">Iniciar Estrés</button>
-    <button onclick="stopStress()">Detener Estrés</button>
-    <pre id="stress_result"></pre>
-</div>
-
-<div class="card">
-    <h2>Acciones Manuales de Elasticidad</h2>
-    <button onclick="manualScaleOut()">Scale Out Manual</button>
-    <button onclick="manualScaleIn()">Scale In Manual</button>
-    <pre id="autoscale_actions_result"></pre>
+    <h2>Instancias aprovisionadas</h2>
+    <button onclick="loadInstances()">Cargar instancias</button>
+    <div id="instances"></div>
+    <pre id="instances_raw"></pre>
 </div>
 
 <script>
@@ -155,175 +69,66 @@ function showJSON(id, data) {
     document.getElementById(id).innerText = JSON.stringify(data, null, 2);
 }
 
-function createBalancer() {
-    fetch('/balancers', {
+function createInstance() {
+    const hostName = document.getElementById('host_name').value;
+    const fileInput = document.getElementById('site_zip');
+
+    if (!hostName) {
+        alert('Debe ingresar un nombre de host');
+        return;
+    }
+
+    if (!fileInput.files.length) {
+        alert('Debe seleccionar un archivo .zip');
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('host_name', hostName);
+    formData.append('site_zip', fileInput.files[0]);
+
+    fetch('/instances', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            name: document.getElementById('b_name').value,
-            ip_address: document.getElementById('b_ip').value,
-            frontend_port: parseInt(document.getElementById('b_port').value),
-            algorithm: "roundrobin"
-        })
+        body: formData
     })
-    .then(r => r.json())
-    .then(data => showJSON('balancers', data));
-}
-
-function createServer() {
-    fetch('/servers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            balancer_id: parseInt(document.getElementById('s_balancer').value),
-            name: document.getElementById('s_name').value,
-            ip_address: document.getElementById('s_ip').value,
-            port: parseInt(document.getElementById('s_port').value)
-        })
-    })
-    .then(r => r.json())
-    .then(data => showJSON('servers', data));
-}
-
-function applyConfig() {
-    fetch('/haproxy/apply', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('apply_result', data));
-}
-
-function loadBalancers() {
-    fetch('/balancers')
-    .then(r => r.json())
-    .then(data => showJSON('balancers', data));
-}
-
-function loadServers() {
-    const id = document.getElementById('filter_id').value;
-    fetch('/servers?balancer_id=' + id)
-    .then(r => r.json())
-    .then(data => showJSON('servers', data));
-}
-
-function saveAutoScaleConfig() {
-    const hostsRaw = document.getElementById('a_available_hosts').value.trim();
-    const availableHosts = hostsRaw
-        ? hostsRaw.split(',').map(h => h.trim()).filter(h => h !== '')
-        : [];
-
-    const payload = {
-        enabled: document.getElementById('a_enabled').value === 'true',
-        high_threshold: parseFloat(document.getElementById('a_high_threshold').value),
-        low_threshold: parseFloat(document.getElementById('a_low_threshold').value),
-        sample_seconds: parseInt(document.getElementById('a_sample_seconds').value),
-        sustain_seconds: parseInt(document.getElementById('a_sustain_seconds').value),
-        min_instances: parseInt(document.getElementById('a_min_instances').value),
-        max_instances: parseInt(document.getElementById('a_max_instances').value),
-        balancer_id: parseInt(document.getElementById('a_balancer_id').value),
-        template_vm_name: document.getElementById('a_template_vm_name').value,
-        base_disk_name_prefix: document.getElementById('a_base_disk_name_prefix').value,
-        app_port: parseInt(document.getElementById('a_app_port').value),
-        ssh_user: document.getElementById('a_ssh_user').value,
-        available_hosts: availableHosts
-    };
-
-    fetch('/autoscale/config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_config_result', data));
-}
-
-function loadAutoScaleConfig() {
-    fetch('/autoscale/config')
     .then(r => r.json())
     .then(data => {
-        showJSON('autoscale_config_result', data);
-
-        document.getElementById('a_enabled').value = String(data.enabled);
-        document.getElementById('a_high_threshold').value = data.high_threshold ?? '';
-        document.getElementById('a_low_threshold').value = data.low_threshold ?? '';
-        document.getElementById('a_sample_seconds').value = data.sample_seconds ?? '';
-        document.getElementById('a_sustain_seconds').value = data.sustain_seconds ?? '';
-        document.getElementById('a_min_instances').value = data.min_instances ?? '';
-        document.getElementById('a_max_instances').value = data.max_instances ?? '';
-        document.getElementById('a_balancer_id').value = data.balancer_id ?? '';
-        document.getElementById('a_template_vm_name').value = data.template_vm_name ?? '';
-        document.getElementById('a_base_disk_name_prefix').value = data.base_disk_name_prefix ?? '';
-        document.getElementById('a_app_port').value = data.app_port ?? '';
-        document.getElementById('a_ssh_user').value = data.ssh_user ?? '';
-        document.getElementById('a_available_hosts').value = (data.available_hosts || []).join(', ');
+        showJSON('create_result', data);
+        loadInstances();
     });
 }
 
-function loadAutoScaleState() {
-    fetch('/autoscale/state')
+function loadInstances() {
+    fetch('/instances')
     .then(r => r.json())
-    .then(data => showJSON('autoscale_state', data));
+    .then(data => {
+        showJSON('instances_raw', data);
+
+        const container = document.getElementById('instances');
+        container.innerHTML = '';
+
+        data.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'card';
+
+            const link = 'http://' + item.fqdn;
+
+            div.innerHTML = `
+                <p><strong>ID:</strong> ${item.id}</p>
+                <p><strong>Host:</strong> ${item.host_name}</p>
+                <p><strong>FQDN:</strong> ${item.fqdn}</p>
+                <p><strong>IP:</strong> ${item.ip_address}</p>
+                <p><strong>VM:</strong> ${item.vm_name}</p>
+                <p><strong>Estado:</strong> ${item.status}</p>
+                <p><a href="${link}" target="_blank">${link}</a></p>
+            `;
+
+            container.appendChild(div);
+        });
+    });
 }
 
-function checkAutoScale() {
-    fetch('/autoscale/check', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_state', data));
-}
-
-function startStress() {
-    const payload = {
-        host: document.getElementById('stress_host').value,
-        ssh_user: document.getElementById('stress_user').value,
-        cpu_workers: parseInt(document.getElementById('stress_cpu').value),
-        timeout_secs: parseInt(document.getElementById('stress_timeout').value)
-    };
-
-    fetch('/stress/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(data => showJSON('stress_result', data));
-}
-
-function stopStress() {
-    const payload = {
-        host: document.getElementById('stress_host').value,
-        ssh_user: document.getElementById('stress_user').value
-    };
-
-    fetch('/stress/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(r => r.json())
-    .then(data => showJSON('stress_result', data));
-}
-
-function manualScaleOut() {
-    fetch('/autoscale/scale-out', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_actions_result', data));
-}
-
-function manualScaleIn() {
-    fetch('/autoscale/scale-in', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_actions_result', data));
-}
-
-function startAutoScale() {
-    fetch('/autoscale/start', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_state', data));
-}
-
-function stopAutoScale() {
-    fetch('/autoscale/stop', { method: 'POST' })
-    .then(r => r.json())
-    .then(data => showJSON('autoscale_state', data));
-}
+loadInstances();
 </script>
 
 </body>

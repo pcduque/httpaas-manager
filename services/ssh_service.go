@@ -40,27 +40,3 @@ func CopyFileBySCP(cfg SSHConfig, localPath string) (string, error) {
 		target,
 	)
 }
-
-func ApplyRemoteHAProxyConfig(cfg SSHConfig, localConfigPath string) error {
-	output, err := CopyFileBySCP(cfg, localConfigPath)
-	if err != nil {
-		return fmt.Errorf("error copying file by scp: %v - output: %s", err, output)
-	}
-
-	moveCmd := fmt.Sprintf("sudo mv %s/haproxy.cfg /etc/haproxy/haproxy.cfg", cfg.RemotePath)
-	if output, err := RunSSHCommand(cfg, moveCmd); err != nil {
-		return fmt.Errorf("error moving haproxy.cfg on remote server: %v - output: %s", err, output)
-	}
-
-	validateCmd := "sudo haproxy -c -f /etc/haproxy/haproxy.cfg"
-	if output, err := RunSSHCommand(cfg, validateCmd); err != nil {
-		return fmt.Errorf("haproxy config validation failed: %v - output: %s", err, output)
-	}
-
-	reloadCmd := "sudo systemctl reload haproxy"
-	if output, err := RunSSHCommand(cfg, reloadCmd); err != nil {
-		return fmt.Errorf("error reloading haproxy: %v - output: %s", err, output)
-	}
-
-	return nil
-}
