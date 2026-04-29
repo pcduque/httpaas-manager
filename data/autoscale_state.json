@@ -1,0 +1,9 @@
+{
+  "last_cpu_average": 5.319148936170214,
+  "active_instances": 2,
+  "last_action": "within_thresholds",
+  "last_action_time": "2026-04-16T17:08:37-05:00",
+  "high_counter": 0,
+  "low_counter": 0,
+  "is_running": true
+}
