@@ -18,7 +18,7 @@ func AddDNSRecord(cfg DNSConfig, hostName string, ipAddress string) error {
 	zone := strings.TrimSuffix(cfg.Zone, ".")
 	fqdn := fmt.Sprintf("%s.%s.", hostName, zone)
 
-	script := fmt.Sprintf(`nsupdate -k /etc/bind/rndc.key <<EOF
+	script := SudoPrelude() + fmt.Sprintf(`sudo nsupdate -k /etc/bind/rndc.key <<EOF
 server 127.0.0.1
 zone %s.
 update delete %s A
@@ -38,7 +38,7 @@ func RemoveDNSRecord(cfg DNSConfig, hostName string) error {
 	zone := strings.TrimSuffix(cfg.Zone, ".")
 	fqdn := fmt.Sprintf("%s.%s.", hostName, zone)
 
-	script := fmt.Sprintf(`nsupdate -k /etc/bind/rndc.key <<EOF
+	script := SudoPrelude() + fmt.Sprintf(`sudo nsupdate -k /etc/bind/rndc.key <<EOF
 server 127.0.0.1
 zone %s.
 update delete %s A

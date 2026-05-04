@@ -7,14 +7,26 @@ import (
 )
 
 // ConfigureClone sets the hostname and applies the static IP on the freshly
-// cloned VM. Networking is restarted in a detached subshell so the SSH session
-// returns cleanly before the interface flap kicks the connection.
+// cloned VM without restarting networking. The new IP is added live with
+// `ip addr add` so the clone is reachable on it immediately while keeping the
+// initialIP bound (so this very SSH session doesn't get killed). The persistent
+// config is written for future reboots, and the old IP is dropped in a detached
+// subshell after the SSH session returns.
 func ConfigureClone(initialIP, sshUser, hostName, staticIP, prefix string) error {
+	_ = prefix
 	cfg := SSHConfig{User: sshUser, Host: initialIP}
 
-	cmd := fmt.Sprintf(`set -e
+	cmd := SudoPrelude() + fmt.Sprintf(`set -e
+sudo ip addr add %s/24 dev enp0s3 2>/dev/null || true
+
 echo '%s' | sudo tee /etc/hostname >/dev/null
 sudo hostnamectl set-hostname %s
+
+if grep -qE '^127\.0\.1\.1' /etc/hosts; then
+    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1 %s/" /etc/hosts
+else
+    echo "127.0.1.1 %s" | sudo tee -a /etc/hosts >/dev/null
+fi
 
 sudo tee /etc/network/interfaces >/dev/null <<NETEOF
 auto lo
@@ -26,11 +38,11 @@ iface enp0s3 inet static
     netmask 255.255.255.0
 NETEOF
 
-(sleep 2 && sudo systemctl restart networking) &
+(sleep 5 && sudo ip addr del %s/24 dev enp0s3 2>/dev/null) &
+disown 2>/dev/null || true
 exit 0
-`, hostName, hostName, staticIP)
+`, staticIP, hostName, hostName, hostName, hostName, staticIP, initialIP)
 
-	_ = prefix
 	if output, err := RunSSHCommand(cfg, cmd); err != nil {
 		return fmt.Errorf("configure clone (hostname/IP): %v - output: %s", err, output)
 	}
@@ -54,7 +66,7 @@ func DeployZipToApache(targetIP, sshUser, localZipPath string) error {
 	}
 
 	sshCfg := SSHConfig{User: sshUser, Host: targetIP}
-	cmd := fmt.Sprintf(`set -e
+	cmd := SudoPrelude() + fmt.Sprintf(`set -e
 sudo rm -rf /var/www/html/*
 sudo unzip -o %s -d /var/www/html
 sudo chown -R www-data:www-data /var/www/html
