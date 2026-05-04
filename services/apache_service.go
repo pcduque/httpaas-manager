@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path"
 	"strings"
+
+	"httpaas-manager/config"
 )
 
 // ConfigureClone sets the hostname and applies the static IP on the freshly
@@ -66,13 +68,33 @@ func DeployZipToApache(targetIP, sshUser, localZipPath string) error {
 	}
 
 	sshCfg := SSHConfig{User: sshUser, Host: targetIP}
-	cmd := SudoPrelude() + fmt.Sprintf(`set -e
-sudo rm -rf /var/www/html/*
-sudo unzip -o %s -d /var/www/html
-sudo chown -R www-data:www-data /var/www/html
-sudo systemctl reload apache2 || sudo systemctl restart apache2
-rm -f %s
-`, remoteZip, remoteZip)
+	cmd := fmt.Sprintf(`exec 2>&1
+echo "::TRACE_v3:: ssh start on $(hostname) as $(whoami) target=%s"
+ls -la %s || echo "::TRACE:: remote zip not visible to %s"
+echo '%s' | sudo -S bash -c '
+echo "::TRACE:: inside sudo as $(whoami)"
+LOG=/tmp/httpaas-deploy.log
+(
+  set -ex
+  command -v unzip >/dev/null 2>&1 || { echo "ERROR: unzip is not installed on the target VM"; exit 1; }
+  test -s %s || { echo "ERROR: uploaded zip is missing or empty"; exit 1; }
+  mkdir -p /var/www/html
+  rm -rf /var/www/html/*
+  unzip -o %s -d /var/www/html
+  chown -R www-data:www-data /var/www/html
+  systemctl reload apache2 || systemctl restart apache2
+  rm -f %s
+) >"$LOG" 2>&1
+status=$?
+echo "::DEPLOY_LOG_BEGIN (exit $status)::"
+cat "$LOG" 2>&1 || echo "(log file not readable)"
+echo "::DEPLOY_LOG_END::"
+exit $status
+'
+SUDO_STATUS=$?
+echo "::TRACE:: sudo exited with $SUDO_STATUS"
+exit $SUDO_STATUS
+`, remoteZip, remoteZip, sshUser, config.SSHPassword, remoteZip, remoteZip, remoteZip)
 
 	if output, err := RunSSHCommand(sshCfg, cmd); err != nil {
 		return fmt.Errorf("deploy zip on %s: %v - output: %s", targetIP, err, output)
