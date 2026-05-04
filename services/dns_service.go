@@ -2,47 +2,52 @@ package services
 
 import (
 	"fmt"
+	"strings"
 )
 
 type DNSConfig struct {
-	Host       string
-	User       string
-	Zone       string
-	ZoneFile   string
-	RemotePath string
+	Host string
+	User string
+	Zone string
 }
 
+// AddDNSRecord adds an A record for hostName.<zone> pointing to ipAddress.
+// Executes nsupdate on the authoritative DNS server (ns1) over SSH so the
+// TSIG key stored there is used. FQDNs always include the trailing dot.
 func AddDNSRecord(cfg DNSConfig, hostName string, ipAddress string) error {
-	if cfg.User == "" {
-		cfg.User = "server1"
+	zone := strings.TrimSuffix(cfg.Zone, ".")
+	fqdn := fmt.Sprintf("%s.%s.", hostName, zone)
+
+	script := fmt.Sprintf(`nsupdate -k /etc/bind/rndc.key <<EOF
+server 127.0.0.1
+zone %s.
+update delete %s A
+update add %s 300 A %s
+send
+EOF`, zone, fqdn, fqdn, ipAddress)
+
+	sshCfg := SSHConfig{User: cfg.User, Host: cfg.Host}
+	if output, err := RunSSHCommand(sshCfg, script); err != nil {
+		return fmt.Errorf("nsupdate add %s: %v - output: %s", fqdn, err, output)
 	}
+	return nil
+}
 
-	if cfg.Zone == "" {
-		cfg.Zone = "cloud.local"
+// RemoveDNSRecord deletes the A record for hostName.<zone>.
+func RemoveDNSRecord(cfg DNSConfig, hostName string) error {
+	zone := strings.TrimSuffix(cfg.Zone, ".")
+	fqdn := fmt.Sprintf("%s.%s.", hostName, zone)
+
+	script := fmt.Sprintf(`nsupdate -k /etc/bind/rndc.key <<EOF
+server 127.0.0.1
+zone %s.
+update delete %s A
+send
+EOF`, zone, fqdn)
+
+	sshCfg := SSHConfig{User: cfg.User, Host: cfg.Host}
+	if output, err := RunSSHCommand(sshCfg, script); err != nil {
+		return fmt.Errorf("nsupdate remove %s: %v - output: %s", fqdn, err, output)
 	}
-
-	if cfg.ZoneFile == "" {
-		cfg.ZoneFile = "/etc/bind/db.cloud.local"
-	}
-
-	sshCfg := SSHConfig{
-		User: cfg.User,
-		Host: cfg.Host,
-	}
-
-	record := fmt.Sprintf("%s    IN    A    %s", hostName, ipAddress)
-
-	cmd := fmt.Sprintf(`
-if ! grep -q "^%s[[:space:]]" %s; then
-  echo "%s" | sudo tee -a %s
-fi
-sudo named-checkzone %s %s &&
-sudo systemctl restart bind9
-`, hostName, cfg.ZoneFile, record, cfg.ZoneFile, cfg.Zone, cfg.ZoneFile)
-
-	if output, err := RunSSHCommand(sshCfg, cmd); err != nil {
-		return fmt.Errorf("error adding DNS record: %v - output: %s", err, output)
-	}
-
 	return nil
 }

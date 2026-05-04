@@ -5,95 +5,137 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"httpaas-manager/config"
 )
 
-const VBoxManagePath = `C:\Program Files\Oracle\VirtualBox\VBoxManage.exe`
-
 type VMConfig struct {
-	VMName            string
-	TemplateVMName    string
-	BridgeAdapterName string
+	VMName         string
+	TemplateVMName string
+	HostOnlyIF     string
+}
+
+type VBoxRunner struct {
+	Local          bool
+	WindowsHost    string
+	WindowsUser    string
+	SSHKeyPath     string
+	VBoxManagePath string
+}
+
+var runner VBoxRunner
+
+func InitVBox(cfg config.Config) {
+	runner = VBoxRunner{
+		Local:          cfg.VBoxLocal,
+		WindowsHost:    cfg.WindowsHost,
+		WindowsUser:    cfg.WindowsUser,
+		SSHKeyPath:     cfg.SSHKeyPath,
+		VBoxManagePath: cfg.VBoxManagePath,
+	}
+}
+
+// VBoxMode returns a human-readable string describing the active execution mode.
+func VBoxMode() string {
+	if runner.Local {
+		return "local (" + runner.VBoxManagePath + ")"
+	}
+	return "remote ssh (" + runner.WindowsUser + "@" + runner.WindowsHost + ")"
 }
 
 func RunVBoxManage(args ...string) (string, error) {
-	cmd := exec.Command(VBoxManagePath, args...)
-	output, err := cmd.CombinedOutput()
-	return string(output), err
+	return runner.run(args...)
 }
 
-func CreateApacheVM(cfg VMConfig) error {
-	if cfg.BridgeAdapterName == "" {
-		cfg.BridgeAdapterName = "Intel(R) Dual Band Wireless-AC 8265"
+func (r VBoxRunner) run(args ...string) (string, error) {
+	if r.Local {
+		return r.runLocal(args...)
+	}
+	return r.runRemote(args...)
+}
+
+func (r VBoxRunner) runLocal(args ...string) (string, error) {
+	binary := r.VBoxManagePath
+	if binary == "" {
+		binary = "VBoxManage"
+	}
+	cmd := exec.Command(binary, args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func (r VBoxRunner) runRemote(args ...string) (string, error) {
+	parts := make([]string, 0, len(args)+1)
+	parts = append(parts, quoteWinArg(r.VBoxManagePath))
+	for _, a := range args {
+		parts = append(parts, quoteWinArg(a))
+	}
+	remoteCmd := strings.Join(parts, " ")
+
+	sshArgs := []string{
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+	}
+	if r.SSHKeyPath != "" {
+		sshArgs = append(sshArgs, "-i", r.SSHKeyPath)
+	}
+	sshArgs = append(sshArgs, fmt.Sprintf("%s@%s", r.WindowsUser, r.WindowsHost), remoteCmd)
+
+	cmd := exec.Command("ssh", sshArgs...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+func quoteWinArg(arg string) string {
+	if arg == "" {
+		return `""`
+	}
+	if !strings.ContainsAny(arg, " \t\"") {
+		return arg
+	}
+	escaped := strings.ReplaceAll(arg, `"`, `\"`)
+	return `"` + escaped + `"`
+}
+
+// CloneApacheVM clones the template VM, attaches a host-only NIC, and boots it headless.
+func CloneApacheVM(cfg VMConfig) error {
+	if cfg.HostOnlyIF == "" {
+		cfg.HostOnlyIF = config.HostOnlyIF
+	}
+	if cfg.TemplateVMName == "" {
+		cfg.TemplateVMName = config.TemplateVM
 	}
 
-	sourceDisk := fmt.Sprintf(
-		"C:/Users/Lenovo/VirtualBox VMs/%s/%s.vdi",
-		cfg.TemplateVMName,
-		cfg.TemplateVMName,
-	)
-
-	targetDisk := fmt.Sprintf(
-		"C:/Users/Lenovo/VirtualBox VMs/%s.vdi",
-		cfg.VMName,
-	)
-
-	if output, err := RunVBoxManage("createvm", "--name", cfg.VMName, "--register"); err != nil {
-		return fmt.Errorf("error creating VM: %v - output: %s", err, output)
+	if out, err := RunVBoxManage("clonevm", cfg.TemplateVMName,
+		"--name", cfg.VMName, "--register"); err != nil {
+		return fmt.Errorf("clonevm: %v - %s", err, out)
 	}
 
-	if output, err := RunVBoxManage("modifyvm", cfg.VMName, "--memory", "1024", "--ostype", "Debian_64", "--cpus", "1"); err != nil {
-		return fmt.Errorf("error configuring VM: %v - output: %s", err, output)
+	if out, err := RunVBoxManage("modifyvm", cfg.VMName,
+		"--nic1", "hostonly",
+		"--hostonlyadapter1", cfg.HostOnlyIF); err != nil {
+		return fmt.Errorf("modifyvm hostonly: %v - %s", err, out)
 	}
 
-	if output, err := RunVBoxManage("modifyvm", cfg.VMName, "--nic1", "bridged", "--bridgeadapter1", cfg.BridgeAdapterName); err != nil {
-		return fmt.Errorf("error configuring network: %v - output: %s", err, output)
-	}
-
-	if output, err := RunVBoxManage("storagectl", cfg.VMName, "--name", "SATA", "--add", "sata", "--controller", "IntelAhci"); err != nil {
-		return fmt.Errorf("error creating storage controller: %v - output: %s", err, output)
-	}
-
-	if output, err := RunVBoxManage("clonemedium", "disk", sourceDisk, targetDisk, "--format", "VDI"); err != nil {
-		return fmt.Errorf("error cloning disk: %v - output: %s", err, output)
-	}
-
-	if output, err := RunVBoxManage("modifymedium", targetDisk, "--type", "multiattach"); err != nil {
-		return fmt.Errorf("error setting disk multiattach: %v - output: %s", err, output)
-	}
-
-	if output, err := RunVBoxManage(
-		"storageattach", cfg.VMName,
-		"--storagectl", "SATA",
-		"--port", "0",
-		"--device", "0",
-		"--type", "hdd",
-		"--medium", targetDisk,
-	); err != nil {
-		return fmt.Errorf("error attaching disk: %v - output: %s", err, output)
-	}
-
-	if output, err := RunVBoxManage("startvm", cfg.VMName, "--type", "headless"); err != nil {
-		return fmt.Errorf("error starting VM: %v - output: %s", err, output)
+	if out, err := RunVBoxManage("startvm", cfg.VMName, "--type", "headless"); err != nil {
+		return fmt.Errorf("startvm: %v - %s", err, out)
 	}
 
 	return nil
 }
 
-func GetVMIPAddress(vmName string) (string, error) {
-	for i := 0; i < 20; i++ {
-		output, err := RunVBoxManage("guestproperty", "get", vmName, "/VirtualBox/GuestInfo/Net/0/V4/IP")
-		if err == nil && strings.Contains(output, "Value:") {
-			parts := strings.Split(output, "Value:")
-			if len(parts) == 2 {
-				ip := strings.TrimSpace(parts[1])
-				if ip != "" && ip != "no value set!" {
-					return ip, nil
-				}
-			}
+// UnregisterVM powers off the VM and removes it together with its disks.
+func UnregisterVM(vmName string) error {
+	if out, err := RunVBoxManage("controlvm", vmName, "poweroff"); err != nil {
+		if !strings.Contains(out, "is not currently running") {
+			fmt.Printf("warning: poweroff %s: %v - %s\n", vmName, err, out)
 		}
-
-		time.Sleep(5 * time.Second)
 	}
 
-	return "", fmt.Errorf("could not get IP for VM %s", vmName)
+	time.Sleep(3 * time.Second)
+
+	if out, err := RunVBoxManage("unregistervm", vmName, "--delete"); err != nil {
+		return fmt.Errorf("unregistervm: %v - %s", err, out)
+	}
+	return nil
 }

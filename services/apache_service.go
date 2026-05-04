@@ -2,76 +2,68 @@ package services
 
 import (
 	"fmt"
+	"path"
+	"strings"
 )
 
-func DeployZipToApache(ipAddress string, sshUser string, zipPath string) error {
-	if sshUser == "" {
-		sshUser = "server1"
-	}
+// ConfigureClone sets the hostname and applies the static IP on the freshly
+// cloned VM. Networking is restarted in a detached subshell so the SSH session
+// returns cleanly before the interface flap kicks the connection.
+func ConfigureClone(initialIP, sshUser, hostName, staticIP, prefix string) error {
+	cfg := SSHConfig{User: sshUser, Host: initialIP}
 
-	cfg := SSHConfig{
-		User:       sshUser,
-		Host:       ipAddress,
-		RemotePath: "/home/" + sshUser,
-	}
-
-	if output, err := CopyFileBySCP(cfg, zipPath); err != nil {
-		return fmt.Errorf("error copying zip to apache VM: %v - output: %s", err, output)
-	}
-
-	remoteZip := fmt.Sprintf("/home/%s/site.zip", sshUser)
-
-	cmd := fmt.Sprintf(`
-sudo apt update -y &&
-sudo apt install apache2 unzip -y &&
-sudo rm -rf /var/www/html/* &&
-sudo mv /home/%s/%s %s &&
-sudo unzip -o %s -d /var/www/html &&
-sudo chown -R www-data:www-data /var/www/html &&
-sudo systemctl enable apache2 &&
-sudo systemctl restart apache2
-`, sshUser, getFileName(zipPath), remoteZip, remoteZip)
-
-	if output, err := RunSSHCommand(cfg, cmd); err != nil {
-		return fmt.Errorf("error deploying apache site: %v - output: %s", err, output)
-	}
-
-	return nil
-}
-
-func ConfigureHostname(ipAddress string, sshUser string, hostName string) error {
-	if sshUser == "" {
-		sshUser = "server1"
-	}
-
-	cfg := SSHConfig{
-		User: sshUser,
-		Host: ipAddress,
-	}
-
-	cmd := fmt.Sprintf(`
-echo '%s' | sudo tee /etc/hostname &&
+	cmd := fmt.Sprintf(`set -e
+echo '%s' | sudo tee /etc/hostname >/dev/null
 sudo hostnamectl set-hostname %s
-`, hostName, hostName)
 
+sudo tee /etc/network/interfaces >/dev/null <<NETEOF
+auto lo
+iface lo inet loopback
+
+auto enp0s3
+iface enp0s3 inet static
+    address %s
+    netmask 255.255.255.0
+NETEOF
+
+(sleep 2 && sudo systemctl restart networking) &
+exit 0
+`, hostName, hostName, staticIP)
+
+	_ = prefix
 	if output, err := RunSSHCommand(cfg, cmd); err != nil {
-		return fmt.Errorf("error configuring hostname: %v - output: %s", err, output)
+		return fmt.Errorf("configure clone (hostname/IP): %v - output: %s", err, output)
 	}
-
 	return nil
 }
 
-func getFileName(path string) string {
-	lastSlash := -1
-	for i, ch := range path {
-		if ch == '/' || ch == '\\' {
-			lastSlash = i
-		}
+// DeployZipToApache uploads the .zip to the target VM, unzips it under
+// /var/www/html and reloads Apache. Apache is assumed already installed in the
+// template VM, so no apt install is performed.
+func DeployZipToApache(targetIP, sshUser, localZipPath string) error {
+	remoteFileName := path.Base(strings.ReplaceAll(localZipPath, "\\", "/"))
+	remoteZip := path.Join("/home", sshUser, remoteFileName)
+
+	scpCfg := SSHConfig{
+		User:       sshUser,
+		Host:       targetIP,
+		RemotePath: remoteZip,
+	}
+	if output, err := CopyFileBySCP(scpCfg, localZipPath); err != nil {
+		return fmt.Errorf("scp zip to %s: %v - output: %s", targetIP, err, output)
 	}
 
-	if lastSlash >= 0 && lastSlash+1 < len(path) {
-		return path[lastSlash+1:]
-	}
+	sshCfg := SSHConfig{User: sshUser, Host: targetIP}
+	cmd := fmt.Sprintf(`set -e
+sudo rm -rf /var/www/html/*
+sudo unzip -o %s -d /var/www/html
+sudo chown -R www-data:www-data /var/www/html
+sudo systemctl reload apache2 || sudo systemctl restart apache2
+rm -f %s
+`, remoteZip, remoteZip)
 
-	return path
+	if output, err := RunSSHCommand(sshCfg, cmd); err != nil {
+		return fmt.Errorf("deploy zip on %s: %v - output: %s", targetIP, err, output)
+	}
+	return nil
 }

@@ -8,12 +8,9 @@
             font-family: Arial, sans-serif;
             background: #f4f6f8;
             margin: 20px;
-        }
-
-        h1, h2 {
             color: #222;
         }
-
+        h1, h2 { color: #222; }
         .card {
             background: white;
             padding: 18px;
@@ -21,12 +18,14 @@
             border-radius: 8px;
             box-shadow: 0 1px 4px rgba(0,0,0,.1);
         }
-
-        input, button {
-            padding: 8px;
-            margin: 5px;
+        input, button { padding: 8px; margin: 5px; font-size: 14px; }
+        button {
+            background: #0b65c2;
+            color: white;
+            border: 0;
+            border-radius: 4px;
+            cursor: pointer;
         }
-
         pre {
             background: #111;
             color: #00ff66;
@@ -34,11 +33,8 @@
             border-radius: 6px;
             white-space: pre-wrap;
             overflow-x: auto;
-        }
-
-        a {
-            color: #0b65c2;
-            font-weight: bold;
+            min-height: 60px;
+            font-family: Consolas, "Courier New", monospace;
         }
     </style>
 </head>
@@ -47,85 +43,54 @@
 <h1>HTTPaaS Manager</h1>
 
 <div class="card">
-    <h2>Publicar nueva página o aplicación web</h2>
-
-    <input id="host_name" placeholder="Nombre del host (ej: paisajes)">
+    <h2>Publicar nueva pagina o aplicacion web</h2>
+    <input id="host_name" placeholder="ej: paisaje">
     <input id="site_zip" type="file" accept=".zip">
-
     <button onclick="createInstance()">Publicar</button>
-
     <pre id="create_result"></pre>
 </div>
 
 <div class="card">
     <h2>Instancias aprovisionadas</h2>
     <button onclick="loadInstances()">Cargar instancias</button>
-    <div id="instances"></div>
-    <pre id="instances_raw"></pre>
+    <pre id="instances_raw">[]</pre>
 </div>
 
 <script>
-function showJSON(id, data) {
-    document.getElementById(id).innerText = JSON.stringify(data, null, 2);
+function show(id, data) {
+    const el = document.getElementById(id);
+    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
 }
 
-function createInstance() {
-    const hostName = document.getElementById('host_name').value;
+async function createInstance() {
+    const hostName = document.getElementById('host_name').value.trim();
     const fileInput = document.getElementById('site_zip');
-
-    if (!hostName) {
-        alert('Debe ingresar un nombre de host');
-        return;
-    }
-
-    if (!fileInput.files.length) {
-        alert('Debe seleccionar un archivo .zip');
-        return;
-    }
+    if (!hostName) { alert('Debe ingresar un nombre de host'); return; }
+    if (!fileInput.files.length) { alert('Debe seleccionar un archivo .zip'); return; }
 
     const formData = new FormData();
     formData.append('host_name', hostName);
     formData.append('site_zip', fileInput.files[0]);
 
-    fetch('/instances', {
-        method: 'POST',
-        body: formData
-    })
-    .then(r => r.json())
-    .then(data => {
-        showJSON('create_result', data);
+    show('create_result', 'Provisionando ' + hostName + '...');
+    try {
+        const res = await fetch('/instances', { method: 'POST', body: formData });
+        const data = await res.json();
+        show('create_result', data);
         loadInstances();
-    });
+    } catch (e) {
+        show('create_result', 'Error: ' + e.message);
+    }
 }
 
-function loadInstances() {
-    fetch('/instances')
-    .then(r => r.json())
-    .then(data => {
-        showJSON('instances_raw', data);
-
-        const container = document.getElementById('instances');
-        container.innerHTML = '';
-
-        data.forEach(item => {
-            const div = document.createElement('div');
-            div.className = 'card';
-
-            const link = 'http://' + item.fqdn;
-
-            div.innerHTML = `
-                <p><strong>ID:</strong> ${item.id}</p>
-                <p><strong>Host:</strong> ${item.host_name}</p>
-                <p><strong>FQDN:</strong> ${item.fqdn}</p>
-                <p><strong>IP:</strong> ${item.ip_address}</p>
-                <p><strong>VM:</strong> ${item.vm_name}</p>
-                <p><strong>Estado:</strong> ${item.status}</p>
-                <p><a href="${link}" target="_blank">${link}</a></p>
-            `;
-
-            container.appendChild(div);
-        });
-    });
+async function loadInstances() {
+    try {
+        const res = await fetch('/instances');
+        const data = await res.json();
+        show('instances_raw', data);
+    } catch (e) {
+        show('instances_raw', 'Error: ' + e.message);
+    }
 }
 
 loadInstances();

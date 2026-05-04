@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>HTTPaaS Test Page</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="card">
+        <h1>HTTPaaS deploy ok</h1>
+        <p class="tag">Apache + Bind9 + VirtualBox</p>
+
+        <ul>
+            <li><strong>Hostname:</strong> <span id="host"></span></li>
+            <li><strong>URL:</strong> <span id="url"></span></li>
+            <li><strong>Hora del cliente:</strong> <span id="now"></span></li>
+        </ul>
+
+        <p class="footer">
+            Si ves esta pagina, el clonado, la configuracion del clone,
+            <code>nsupdate</code> y el deploy via SCP funcionaron.
+        </p>
+    </main>
+
+    <script>
+        document.getElementById('host').textContent = location.hostname || '(unknown)';
+        document.getElementById('url').textContent  = location.href;
+        document.getElementById('now').textContent  = new Date().toLocaleString();
+    </script>
+</body>
+</html>

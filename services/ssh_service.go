@@ -24,6 +24,7 @@ func RunSSHCommand(cfg SSHConfig, command string) (string, error) {
 		"ssh",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
 		target,
 		command,
 	)
@@ -36,6 +37,7 @@ func CopyFileBySCP(cfg SSHConfig, localPath string) (string, error) {
 		"scp",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
+		"-o", "ConnectTimeout=10",
 		localPath,
 		target,
 	)
