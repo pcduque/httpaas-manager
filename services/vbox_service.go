@@ -124,6 +124,28 @@ func CloneApacheVM(cfg VMConfig) error {
 	return nil
 }
 
+// StartVM boots an existing registered VM in headless mode.
+func StartVM(vmName string) error {
+	if out, err := RunVBoxManage("startvm", vmName, "--type", "headless"); err != nil {
+		if strings.Contains(out, "is already locked") || strings.Contains(out, "already running") {
+			return nil
+		}
+		return fmt.Errorf("startvm %s: %v - %s", vmName, err, out)
+	}
+	return nil
+}
+
+// StopVM sends an ACPI shutdown signal so the guest powers off cleanly.
+func StopVM(vmName string) error {
+	if out, err := RunVBoxManage("controlvm", vmName, "acpipowerbutton"); err != nil {
+		if strings.Contains(out, "is not currently running") {
+			return nil
+		}
+		return fmt.Errorf("controlvm acpipowerbutton %s: %v - %s", vmName, err, out)
+	}
+	return nil
+}
+
 // UnregisterVM powers off the VM and removes it together with its disks.
 func UnregisterVM(vmName string) error {
 	if out, err := RunVBoxManage("controlvm", vmName, "poweroff"); err != nil {

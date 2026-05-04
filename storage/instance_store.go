@@ -60,6 +60,23 @@ func AddInstance(instance models.WebInstance) (models.WebInstance, error) {
 	return instance, nil
 }
 
+func UpdateInstanceStatus(hostName, status string) (models.WebInstance, bool, error) {
+	instances, err := LoadInstances()
+	if err != nil {
+		return models.WebInstance{}, false, err
+	}
+	for i, ins := range instances {
+		if ins.HostName == hostName {
+			instances[i].Status = status
+			if err := SaveInstances(instances); err != nil {
+				return models.WebInstance{}, false, err
+			}
+			return instances[i], true, nil
+		}
+	}
+	return models.WebInstance{}, false, nil
+}
+
 func RemoveInstanceByHostName(hostName string) (models.WebInstance, bool, error) {
 	instances, err := LoadInstances()
 	if err != nil {

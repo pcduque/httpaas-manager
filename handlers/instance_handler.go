@@ -127,6 +127,7 @@ func CreateInstance(w http.ResponseWriter, r *http.Request) {
 		IP:        staticIP,
 		VMName:    vmName,
 		CreatedAt: time.Now().Format(time.RFC3339),
+		Status:    "running",
 	}
 	saved, err := storage.AddInstance(instance)
 	if err != nil {
@@ -173,6 +174,86 @@ func DeleteInstance(w http.ResponseWriter, r *http.Request) {
 		"vm":      removed.VMName,
 		"ip":      removed.IP,
 	})
+}
+
+func StartInstance(w http.ResponseWriter, r *http.Request) {
+	hostName := strings.TrimSpace(r.URL.Query().Get("host_name"))
+	if hostName == "" {
+		utils.WriteError(w, http.StatusBadRequest, "host_name is required")
+		return
+	}
+	hostName = sanitizeHostName(hostName)
+
+	instances, err := storage.LoadInstances()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var target models.WebInstance
+	found := false
+	for _, ins := range instances {
+		if ins.HostName == hostName {
+			target = ins
+			found = true
+			break
+		}
+	}
+	if !found {
+		utils.WriteError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+
+	if err := services.StartVM(target.VMName); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	updated, _, err := storage.UpdateInstanceStatus(hostName, "running")
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.WriteJSON(w, http.StatusOK, updated)
+}
+
+func StopInstance(w http.ResponseWriter, r *http.Request) {
+	hostName := strings.TrimSpace(r.URL.Query().Get("host_name"))
+	if hostName == "" {
+		utils.WriteError(w, http.StatusBadRequest, "host_name is required")
+		return
+	}
+	hostName = sanitizeHostName(hostName)
+
+	instances, err := storage.LoadInstances()
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	var target models.WebInstance
+	found := false
+	for _, ins := range instances {
+		if ins.HostName == hostName {
+			target = ins
+			found = true
+			break
+		}
+	}
+	if !found {
+		utils.WriteError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+
+	if err := services.StopVM(target.VMName); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	updated, _, err := storage.UpdateInstanceStatus(hostName, "stopped")
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	utils.WriteJSON(w, http.StatusOK, updated)
 }
 
 func waitForSSH(ip string, user string) error {

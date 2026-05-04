@@ -29,6 +29,20 @@ func main() {
 	handlers.Init(cfg)
 
 	http.HandleFunc("/instances", instancesRoute)
+	http.HandleFunc("/instances/start", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		handlers.StartInstance(w, r)
+	})
+	http.HandleFunc("/instances/stop", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			utils.WriteError(w, http.StatusMethodNotAllowed, "method not allowed")
+			return
+		}
+		handlers.StopInstance(w, r)
+	})
 
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)

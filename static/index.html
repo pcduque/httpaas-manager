@@ -36,6 +36,20 @@
             min-height: 60px;
             font-family: Consolas, "Courier New", monospace;
         }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background: #f0f2f5; }
+        .badge {
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .badge-running { background: #d4edda; color: #155724; }
+        .badge-stopped { background: #f8d7da; color: #721c24; }
+        button.danger { background: #c0392b; }
+        button.warn { background: #d68910; }
+        button:disabled { background: #aaa; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -52,8 +66,9 @@
 
 <div class="card">
     <h2>Instancias aprovisionadas</h2>
-    <button onclick="loadInstances()">Cargar instancias</button>
-    <pre id="instances_raw">[]</pre>
+    <button onclick="loadInstances()">Recargar</button>
+    <div id="instances_table"></div>
+    <pre id="action_result"></pre>
 </div>
 
 <script>
@@ -87,13 +102,80 @@ async function createInstance() {
     }
 }
 
+function renderInstances(list) {
+    const container = document.getElementById('instances_table');
+    if (!Array.isArray(list) || list.length === 0) {
+        container.innerHTML = '<p>No hay instancias.</p>';
+        return;
+    }
+    const rows = list.map(ins => {
+        const status = ins.status || 'running';
+        const badgeClass = status === 'running' ? 'badge-running' : 'badge-stopped';
+        const startDisabled = status === 'running' ? 'disabled' : '';
+        const stopDisabled = status === 'stopped' ? 'disabled' : '';
+        const safe = encodeURIComponent(ins.hostname);
+        return `<tr>
+            <td>${ins.hostname}</td>
+            <td>${ins.ip}</td>
+            <td>${ins.vm_name}</td>
+            <td><span class="badge ${badgeClass}">${status}</span></td>
+            <td>
+                <button class="warn" ${startDisabled} onclick="startInstance('${safe}')">Activar</button>
+                <button class="warn" ${stopDisabled} onclick="stopInstance('${safe}')">Desactivar</button>
+                <button class="danger" onclick="deleteInstance('${safe}')">Eliminar</button>
+            </td>
+        </tr>`;
+    }).join('');
+    container.innerHTML = `<table>
+        <thead><tr><th>Host</th><th>IP</th><th>VM</th><th>Estado</th><th>Acciones</th></tr></thead>
+        <tbody>${rows}</tbody>
+    </table>`;
+}
+
 async function loadInstances() {
     try {
         const res = await fetch('/instances');
         const data = await res.json();
-        show('instances_raw', data);
+        renderInstances(data);
     } catch (e) {
-        show('instances_raw', 'Error: ' + e.message);
+        document.getElementById('instances_table').textContent = 'Error: ' + e.message;
+    }
+}
+
+async function deleteInstance(hostName) {
+    if (!confirm('¿Eliminar la instancia ' + decodeURIComponent(hostName) + '? Esto borra la VM y el registro DNS.')) return;
+    show('action_result', 'Eliminando ' + decodeURIComponent(hostName) + '...');
+    try {
+        const res = await fetch('/instances?host_name=' + hostName, { method: 'DELETE' });
+        const data = await res.json();
+        show('action_result', data);
+        loadInstances();
+    } catch (e) {
+        show('action_result', 'Error: ' + e.message);
+    }
+}
+
+async function startInstance(hostName) {
+    show('action_result', 'Activando ' + decodeURIComponent(hostName) + '...');
+    try {
+        const res = await fetch('/instances/start?host_name=' + hostName, { method: 'POST' });
+        const data = await res.json();
+        show('action_result', data);
+        loadInstances();
+    } catch (e) {
+        show('action_result', 'Error: ' + e.message);
+    }
+}
+
+async function stopInstance(hostName) {
+    show('action_result', 'Desactivando ' + decodeURIComponent(hostName) + '...');
+    try {
+        const res = await fetch('/instances/stop?host_name=' + hostName, { method: 'POST' });
+        const data = await res.json();
+        show('action_result', data);
+        loadInstances();
+    } catch (e) {
+        show('action_result', 'Error: ' + e.message);
     }
 }
 
