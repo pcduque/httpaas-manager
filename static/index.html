@@ -77,6 +77,10 @@ async function createInstance() {
         const res = await fetch('/instances', { method: 'POST', body: formData });
         const data = await res.json();
         show('create_result', data);
+        if (res.ok) {
+            document.getElementById('host_name').value = '';
+            fileInput.value = '';
+        }
         loadInstances();
     } catch (e) {
         show('create_result', 'Error: ' + e.message);
