@@ -208,12 +208,21 @@ func StartInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, _, err := storage.UpdateInstanceStatus(hostName, "running")
+	updated, _, err := storage.UpdateInstanceStatus(hostName, "starting")
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, updated)
+
+	go func(ip, host string) {
+		if err := waitForSSH(ip, Cfg.SSHUser); err != nil {
+			storage.UpdateInstanceStatus(host, "stopped")
+			return
+		}
+		storage.UpdateInstanceStatus(host, "running")
+	}(target.IP, hostName)
+
+	utils.WriteJSON(w, http.StatusAccepted, updated)
 }
 
 func StopInstance(w http.ResponseWriter, r *http.Request) {

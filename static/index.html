@@ -47,6 +47,7 @@
         }
         .badge-running { background: #d4edda; color: #155724; }
         .badge-stopped { background: #f8d7da; color: #721c24; }
+        .badge-starting { background: #fff3cd; color: #856404; }
         button.danger { background: #c0392b; }
         button.warn { background: #d68910; }
         button:disabled { background: #aaa; cursor: not-allowed; }
@@ -102,23 +103,30 @@ async function createInstance() {
     }
 }
 
+let startingPollTimer = null;
+
 function renderInstances(list) {
     const container = document.getElementById('instances_table');
     if (!Array.isArray(list) || list.length === 0) {
         container.innerHTML = '<p>No hay instancias.</p>';
+        ensureStartingPoll(list);
         return;
     }
     const rows = list.map(ins => {
         const status = ins.status || 'running';
-        const badgeClass = status === 'running' ? 'badge-running' : 'badge-stopped';
-        const startDisabled = status === 'running' ? 'disabled' : '';
-        const stopDisabled = status === 'stopped' ? 'disabled' : '';
+        let badgeClass = 'badge-stopped';
+        if (status === 'running') badgeClass = 'badge-running';
+        else if (status === 'starting') badgeClass = 'badge-starting';
+        const isTransient = status === 'starting';
+        const label = isTransient ? 'iniciando (puede tardar 2-3 min)' : status;
+        const startDisabled = (status === 'running' || isTransient) ? 'disabled' : '';
+        const stopDisabled = (status === 'stopped' || isTransient) ? 'disabled' : '';
         const safe = encodeURIComponent(ins.hostname);
         return `<tr>
             <td>${ins.hostname}</td>
             <td>${ins.ip}</td>
             <td>${ins.vm_name}</td>
-            <td><span class="badge ${badgeClass}">${status}</span></td>
+            <td><span class="badge ${badgeClass}">${label}</span></td>
             <td>
                 <button class="warn" ${startDisabled} onclick="startInstance('${safe}')">Activar</button>
                 <button class="warn" ${stopDisabled} onclick="stopInstance('${safe}')">Desactivar</button>
@@ -130,6 +138,17 @@ function renderInstances(list) {
         <thead><tr><th>Host</th><th>IP</th><th>VM</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
+    ensureStartingPoll(list);
+}
+
+function ensureStartingPoll(list) {
+    const hasStarting = Array.isArray(list) && list.some(i => (i.status || '') === 'starting');
+    if (hasStarting && !startingPollTimer) {
+        startingPollTimer = setInterval(loadInstances, 5000);
+    } else if (!hasStarting && startingPollTimer) {
+        clearInterval(startingPollTimer);
+        startingPollTimer = null;
+    }
 }
 
 async function loadInstances() {
@@ -149,6 +168,9 @@ async function deleteInstance(hostName) {
         const res = await fetch('/instances?host_name=' + hostName, { method: 'DELETE' });
         const data = await res.json();
         show('action_result', data);
+        if (res.ok) {
+            show('create_result', '');
+        }
         loadInstances();
     } catch (e) {
         show('action_result', 'Error: ' + e.message);
