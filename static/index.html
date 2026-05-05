@@ -2,219 +2,538 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>HTTPaaS Manager</title>
     <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --info: #0ea5e9;
+            --info-hover: #0284c7;
+            --shadow-sm: 0 1px 3px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+            --shadow-md: 0 4px 12px rgba(15, 23, 42, .08);
+        }
+        * { box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
-            background: #f4f6f8;
-            margin: 20px;
-            color: #222;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            font-size: 16px;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
         }
-        h1, h2 { color: #222; }
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #fff;
+            padding: 28px 32px;
+            box-shadow: var(--shadow-sm);
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 26px;
+            font-weight: 600;
+            letter-spacing: -.02em;
+        }
+        .header .subtitle {
+            margin: 4px 0 0;
+            color: #cbd5e1;
+            font-size: 15px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 24px auto;
+            padding: 0 24px;
+            display: grid;
+            gap: 20px;
+        }
         .card {
-            background: white;
-            padding: 18px;
-            margin-bottom: 20px;
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            padding: 22px 24px;
+            border: 1px solid var(--border);
+        }
+        .card h2 {
+            margin: 0 0 6px;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: -.01em;
+        }
+        .card .desc {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0 0 16px;
+        }
+
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        input[type="text"], input[type="file"] {
+            padding: 10px 13px;
+            font-size: 15px;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            box-shadow: 0 1px 4px rgba(0,0,0,.1);
+            background: #fff;
+            color: var(--text);
+            transition: border-color .15s, box-shadow .15s;
+            font-family: inherit;
         }
-        input, button { padding: 8px; margin: 5px; font-size: 14px; }
+        input[type="text"] { min-width: 220px; }
+        input[type="text"]:focus, input[type="file"]:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+        }
+
         button {
-            background: #0b65c2;
-            color: white;
+            padding: 10px 17px;
+            font-size: 15px;
+            font-weight: 500;
             border: 0;
-            border-radius: 4px;
+            border-radius: 8px;
+            background: var(--primary);
+            color: #fff;
             cursor: pointer;
+            transition: background .15s, transform .05s, opacity .15s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
         }
-        pre {
-            background: #111;
-            color: #00ff66;
-            padding: 12px;
-            border-radius: 6px;
-            white-space: pre-wrap;
+        button:hover { background: var(--primary-hover); }
+        button:active { transform: translateY(1px); }
+        button:disabled {
+            background: #e2e8f0;
+            color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button.btn-success { background: var(--success); }
+        button.btn-success:hover:not(:disabled) { background: var(--success-hover); }
+        button.btn-warning { background: var(--warning); }
+        button.btn-warning:hover:not(:disabled) { background: var(--warning-hover); }
+        button.btn-info { background: var(--info); }
+        button.btn-info:hover:not(:disabled) { background: var(--info-hover); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+        button.btn-ghost {
+            background: transparent;
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        button.btn-ghost:hover:not(:disabled) {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+        button.btn-sm { padding: 7px 12px; font-size: 14px; }
+
+        .table-wrap {
             overflow-x: auto;
-            min-height: 60px;
-            font-family: Consolas, "Courier New", monospace;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
-        th { background: #f0f2f5; }
-        .badge {
-            padding: 2px 8px;
             border-radius: 10px;
-            font-size: 12px;
-            font-weight: bold;
+            border: 1px solid var(--border);
         }
-        .badge-running { background: #d4edda; color: #155724; }
-        .badge-stopped { background: #f8d7da; color: #721c24; }
-        .badge-starting { background: #fff3cd; color: #856404; }
-        .badge-stopping { background: #fff3cd; color: #856404; }
-        button.danger { background: #c0392b; }
-        button.warn { background: #d68910; }
-        button:disabled { background: #aaa; cursor: not-allowed; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 15px;
+        }
+        th, td { padding: 13px 15px; text-align: left; }
+        th {
+            background: #f8fafc;
+            color: var(--muted);
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background .12s;
+        }
+        tbody tr:last-child { border-bottom: 0; }
+        tbody tr:hover { background: #f8fafc; }
+        td.host { font-weight: 600; color: var(--text); }
+        td.actions { white-space: nowrap; text-align: right; }
+        td.actions button { margin-left: 6px; }
+        td.actions button:first-child { margin-left: 0; }
+
+        .empty {
+            padding: 48px 20px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 15px;
+            border-radius: 10px;
+            border: 1px dashed var(--border);
+            background: #fafbfc;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 5px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .badge .dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .badge-running { background: #d1fae5; color: #065f46; }
+        .badge-running .dot { background: var(--success); }
+        .badge-stopped { background: #fee2e2; color: #991b1b; }
+        .badge-stopped .dot { background: var(--danger); }
+        .badge-creating { background: #dbeafe; color: #1e40af; }
+        .badge-creating .dot { background: var(--primary); animation: pulse 1.4s infinite; }
+        .badge-transient { background: #fef3c7; color: #92400e; }
+        .badge-transient .dot { background: var(--warning); animation: pulse 1.4s infinite; }
+        .badge-deleting { background: #fee2e2; color: #991b1b; }
+        .badge-deleting .dot { background: var(--danger); animation: pulse 1.4s infinite; }
+        .badge-error { background: #fde68a; color: #78350f; }
+        .badge-error .dot { background: #b45309; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .45; transform: scale(1.35); }
+        }
+
+        .meta-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .meta-bar .meta-info {
+            color: var(--muted);
+            font-size: 14px;
+        }
+        .meta-bar h2 { margin: 0; }
+
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+            pointer-events: none;
+            max-width: calc(100vw - 40px);
+        }
+        .toast {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--info);
+            border-radius: 8px;
+            box-shadow: var(--shadow-md);
+            padding: 13px 17px;
+            min-width: 280px;
+            max-width: 400px;
+            font-size: 15px;
+            color: var(--text);
+            pointer-events: auto;
+            animation: slideIn .2s ease-out;
+        }
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.warning { border-left-color: var(--warning); }
+        .toast.info { border-left-color: var(--info); }
+        .toast .title {
+            font-weight: 600;
+            margin: 0 0 3px;
+            font-size: 15px;
+        }
+        .toast .body {
+            color: var(--muted);
+            font-size: 14px;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .toast.removing { animation: slideOut .2s ease-in forwards; }
+        @keyframes slideIn {
+            from { transform: translateX(20px); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateX(0); opacity: 1; }
+            to { transform: translateX(24px); opacity: 0; }
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        @media (max-width: 720px) {
+            .header { padding: 20px; }
+            .container { padding: 0 16px; margin: 18px auto; }
+            .card { padding: 18px; }
+            td.actions { text-align: left; }
+            td.actions button { margin: 2px 4px 2px 0; }
+        }
     </style>
 </head>
 <body>
 
-<h1>HTTPaaS Manager</h1>
+<header class="header">
+    <h1>HTTPaaS Manager</h1>
+    <p class="subtitle">Aprovisionamiento y orquestación de instancias Apache sobre VirtualBox</p>
+</header>
 
-<div class="card">
-    <h2>Publicar nueva pagina o aplicacion web</h2>
-    <input id="host_name" placeholder="ej: paisaje">
-    <input id="site_zip" type="file" accept=".zip">
-    <button onclick="createInstance()">Publicar</button>
-    <pre id="create_result"></pre>
-</div>
+<main class="container">
+    <section class="card">
+        <h2>Publicar nueva página o aplicación web</h2>
+        <p class="desc">Sube un .zip con tu sitio. El manager creará una VM Debian desde la imagen base multi-attach, registrará el host en BIND9 y desplegará el contenido. Verás el progreso reflejado en el estado de la instancia.</p>
+        <div class="form-row">
+            <input id="host_name" type="text" placeholder="ej: paisaje" autocomplete="off">
+            <input id="site_zip" type="file" accept=".zip">
+            <button id="publish_btn" onclick="createInstance()">Publicar</button>
+        </div>
+    </section>
 
-<div class="card">
-    <h2>Instancias aprovisionadas</h2>
-    <button onclick="loadInstances()">Recargar</button>
-    <div id="instances_table"></div>
-    <pre id="action_result"></pre>
-</div>
+    <section class="card">
+        <div class="meta-bar">
+            <h2>Instancias aprovisionadas</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span class="meta-info" id="meta_info"></span>
+                <button class="btn-ghost btn-sm" onclick="loadInstances(true)">Recargar</button>
+            </div>
+        </div>
+        <div id="instances_table"></div>
+    </section>
+</main>
+
+<div class="toast-container" id="toasts"></div>
 
 <script>
-function show(id, data) {
-    const el = document.getElementById(id);
-    el.textContent = typeof data === "string" ? data : JSON.stringify(data, null, 2);
-}
+    const TRANSIENT_STATES = new Set(['creating', 'starting', 'stopping', 'deleting']);
 
-async function createInstance() {
-    const hostName = document.getElementById('host_name').value.trim();
-    const fileInput = document.getElementById('site_zip');
-    if (!hostName) { alert('Debe ingresar un nombre de host'); return; }
-    if (!fileInput.files.length) { alert('Debe seleccionar un archivo .zip'); return; }
+    const STATUS_META = {
+        creating:   { label: 'creando',      cls: 'badge-creating',  hint: 'Provisionando VM, configurando red y desplegando sitio (≈ 2-4 min)' },
+        starting:   { label: 'iniciando',    cls: 'badge-transient', hint: 'Esperando que SSH responda en la IP estática (≈ 1-3 min)' },
+        stopping:   { label: 'deteniendo',   cls: 'badge-transient', hint: 'ACPI shutdown enviado; si el guest no responde se forzará el apagado en 30 s' },
+        deleting:   { label: 'eliminando',   cls: 'badge-deleting',  hint: 'Removiendo VM, registro DNS y archivos' },
+        running:    { label: 'activa',       cls: 'badge-running',   hint: 'VM encendida y sirviendo HTTP' },
+        stopped:    { label: 'detenida',     cls: 'badge-stopped',   hint: 'VM apagada' },
+        error:      { label: 'error',        cls: 'badge-error',     hint: 'Falló alguna operación; revisa los logs del manager' },
+    };
 
-    const formData = new FormData();
-    formData.append('host_name', hostName);
-    formData.append('site_zip', fileInput.files[0]);
+    let pollTimer = null;
+    let pollInFlight = false;
 
-    if (createResultTimer) { clearTimeout(createResultTimer); createResultTimer = null; }
-    show('create_result', 'Provisionando ' + hostName + '...');
-    try {
-        const res = await fetch('/instances', { method: 'POST', body: formData });
-        const data = await res.json();
-        show('create_result', data);
-        if (res.ok) {
+    function escapeHTML(str) {
+        return String(str).replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function toast(message, kind, title, ttl) {
+        if (kind === undefined) kind = 'info';
+        if (ttl === undefined) ttl = 5000;
+        const container = document.getElementById('toasts');
+        const el = document.createElement('div');
+        el.className = 'toast ' + kind;
+        if (title) {
+            const t = document.createElement('p');
+            t.className = 'title';
+            t.textContent = title;
+            el.appendChild(t);
+        }
+        const b = document.createElement('p');
+        b.className = 'body';
+        b.textContent = message;
+        el.appendChild(b);
+        container.appendChild(el);
+        if (ttl > 0) {
+            setTimeout(() => dismissToast(el), ttl);
+        } else {
+            el.style.cursor = 'pointer';
+            el.title = 'Click para cerrar';
+            el.addEventListener('click', () => dismissToast(el));
+        }
+    }
+    function dismissToast(el) {
+        if (!el.parentNode) return;
+        el.classList.add('removing');
+        setTimeout(() => el.remove(), 200);
+    }
+
+    async function jsonFetch(url, opts) {
+        const res = await fetch(url, opts);
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) {
+            const msg = (data && (data.error || data.message)) || res.statusText || 'request failed';
+            const err = new Error(msg);
+            err.status = res.status;
+            throw err;
+        }
+        return data;
+    }
+
+    async function createInstance() {
+        const hostName = document.getElementById('host_name').value.trim();
+        const fileInput = document.getElementById('site_zip');
+        const btn = document.getElementById('publish_btn');
+
+        if (!hostName) { toast('Ingresa un nombre de host', 'warning'); return; }
+        if (!fileInput.files.length) { toast('Selecciona un archivo .zip', 'warning'); return; }
+
+        const formData = new FormData();
+        formData.append('host_name', hostName);
+        formData.append('site_zip', fileInput.files[0]);
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Subiendo...';
+        try {
+            const data = await jsonFetch('/instances', { method: 'POST', body: formData });
+            toast('La VM se está provisionando en segundo plano. El estado pasará a "activa" cuando esté lista.', 'success', 'Aprovisionamiento iniciado: ' + data.hostname);
             document.getElementById('host_name').value = '';
             fileInput.value = '';
-            createResultTimer = setTimeout(() => {
-                show('create_result', '');
-                createResultTimer = null;
-            }, 5000);
+            loadInstances();
+        } catch (e) {
+            toast(e.message, 'error', 'No se pudo publicar', 0);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Publicar';
         }
-        loadInstances();
-    } catch (e) {
-        show('create_result', 'Error: ' + e.message);
     }
-}
 
-let transientPollTimer = null;
-let createResultTimer = null;
-
-function renderInstances(list) {
-    const container = document.getElementById('instances_table');
-    if (!Array.isArray(list) || list.length === 0) {
-        container.innerHTML = '<p>No hay instancias.</p>';
-        ensureTransientPoll(list);
-        return;
-    }
-    const rows = list.map(ins => {
-        const status = ins.status || 'running';
-        let badgeClass = 'badge-stopped';
-        if (status === 'running') badgeClass = 'badge-running';
-        else if (status === 'starting') badgeClass = 'badge-starting';
-        else if (status === 'stopping') badgeClass = 'badge-stopping';
-        const isTransient = status === 'starting' || status === 'stopping';
-        let label = status;
-        if (status === 'starting') label = 'iniciando (puede tardar 2-3 min)';
-        else if (status === 'stopping') label = 'deteniendo...';
-        const startDisabled = (status === 'running' || isTransient) ? 'disabled' : '';
-        const stopDisabled = (status === 'stopped' || isTransient) ? 'disabled' : '';
-        const safe = encodeURIComponent(ins.hostname);
-        return `<tr>
-            <td>${ins.hostname}</td>
-            <td>${ins.ip}</td>
-            <td>${ins.vm_name}</td>
-            <td><span class="badge ${badgeClass}">${label}</span></td>
-            <td>
-                <button class="warn" ${startDisabled} onclick="startInstance('${safe}')">Activar</button>
-                <button class="warn" ${stopDisabled} onclick="stopInstance('${safe}')">Desactivar</button>
-                <button class="danger" onclick="deleteInstance('${safe}')">Eliminar</button>
-            </td>
-        </tr>`;
-    }).join('');
-    container.innerHTML = `<table>
-        <thead><tr><th>Host</th><th>IP</th><th>VM</th><th>Estado</th><th>Acciones</th></tr></thead>
-        <tbody>${rows}</tbody>
-    </table>`;
-    ensureTransientPoll(list);
-}
-
-function ensureTransientPoll(list) {
-    const hasTransient = Array.isArray(list) && list.some(i => {
-        const s = i.status || '';
-        return s === 'starting' || s === 'stopping';
-    });
-    if (hasTransient && !transientPollTimer) {
-        transientPollTimer = setInterval(loadInstances, 5000);
-    } else if (!hasTransient && transientPollTimer) {
-        clearInterval(transientPollTimer);
-        transientPollTimer = null;
-    }
-}
-
-async function loadInstances() {
-    try {
-        const res = await fetch('/instances');
-        const data = await res.json();
-        renderInstances(data);
-    } catch (e) {
-        document.getElementById('instances_table').textContent = 'Error: ' + e.message;
-    }
-}
-
-async function deleteInstance(hostName) {
-    if (!confirm('¿Eliminar la instancia ' + decodeURIComponent(hostName) + '? Esto borra la VM y el registro DNS.')) return;
-    show('action_result', 'Eliminando ' + decodeURIComponent(hostName) + '...');
-    try {
-        const res = await fetch('/instances?host_name=' + hostName, { method: 'DELETE' });
-        const data = await res.json();
-        show('action_result', data);
-        if (res.ok) {
-            show('create_result', '');
+    function renderInstances(list) {
+        const container = document.getElementById('instances_table');
+        const meta = document.getElementById('meta_info');
+        if (!Array.isArray(list) || list.length === 0) {
+            container.innerHTML = '<div class="empty">No hay instancias aprovisionadas todavía. Publica tu primer sitio arriba.</div>';
+            meta.textContent = '';
+            ensurePolling(list);
+            return;
         }
-        loadInstances();
-    } catch (e) {
-        show('action_result', 'Error: ' + e.message);
-    }
-}
 
-async function startInstance(hostName) {
-    show('action_result', 'Activando ' + decodeURIComponent(hostName) + '...');
-    try {
-        const res = await fetch('/instances/start?host_name=' + hostName, { method: 'POST' });
-        const data = await res.json();
-        show('action_result', data);
-        loadInstances();
-    } catch (e) {
-        show('action_result', 'Error: ' + e.message);
-    }
-}
+        const counts = list.reduce((acc, i) => {
+            const s = i.status || 'running';
+            acc[s] = (acc[s] || 0) + 1;
+            return acc;
+        }, {});
+        const running = counts.running || 0;
+        const transient = list.filter(i => TRANSIENT_STATES.has(i.status || '')).length;
+        let metaText = list.length + ' total · ' + running + ' activa' + (running === 1 ? '' : 's');
+        if (transient > 0) metaText += ' · ' + transient + ' en transición';
+        meta.textContent = metaText;
 
-async function stopInstance(hostName) {
-    show('action_result', 'Desactivando ' + decodeURIComponent(hostName) + '...');
-    try {
-        const res = await fetch('/instances/stop?host_name=' + hostName, { method: 'POST' });
-        const data = await res.json();
-        show('action_result', data);
-        loadInstances();
-    } catch (e) {
-        show('action_result', 'Error: ' + e.message);
-    }
-}
+        const rows = list.map(ins => {
+            const status = ins.status || 'running';
+            const m = STATUS_META[status] || { label: status, cls: 'badge-stopped', hint: '' };
+            const isTransient = TRANSIENT_STATES.has(status);
 
-loadInstances();
+            const startDis = (status === 'running' || isTransient || status === 'error') ? 'disabled' : '';
+            const stopDis = (status === 'stopped' || isTransient || status === 'error') ? 'disabled' : '';
+            const deleteDis = (status === 'deleting') ? 'disabled' : '';
+
+            const safe = encodeURIComponent(ins.hostname);
+            return '<tr>'
+                + '<td class="host">' + escapeHTML(ins.hostname) + '</td>'
+                + '<td>' + escapeHTML(ins.ip) + '</td>'
+                + '<td>' + escapeHTML(ins.vm_name) + '</td>'
+                + '<td><span class="badge ' + m.cls + '" title="' + escapeHTML(m.hint) + '"><span class="dot"></span>' + escapeHTML(m.label) + '</span></td>'
+                + '<td class="actions">'
+                +   '<button class="btn-success btn-sm" ' + startDis + ' onclick="actionInstance(\'' + safe + '\', \'start\')">Activar</button>'
+                +   '<button class="btn-warning btn-sm" ' + stopDis + ' onclick="actionInstance(\'' + safe + '\', \'stop\')">Desactivar</button>'
+                +   '<button class="btn-danger btn-sm" ' + deleteDis + ' onclick="deleteInstance(\'' + safe + '\')">Eliminar</button>'
+                + '</td>'
+                + '</tr>';
+        }).join('');
+
+        container.innerHTML = '<div class="table-wrap"><table>'
+            + '<thead><tr><th>Host</th><th>IP</th><th>VM</th><th>Estado</th><th></th></tr></thead>'
+            + '<tbody>' + rows + '</tbody>'
+            + '</table></div>';
+        ensurePolling(list);
+    }
+
+    function ensurePolling(list) {
+        const hasTransient = Array.isArray(list) && list.some(i => TRANSIENT_STATES.has(i.status || ''));
+        if (hasTransient && !pollTimer) {
+            pollTimer = setInterval(() => loadInstances(false), 4000);
+        } else if (!hasTransient && pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    async function loadInstances(notifyOnError) {
+        if (notifyOnError === undefined) notifyOnError = true;
+        if (pollInFlight) return;
+        pollInFlight = true;
+        try {
+            const data = await jsonFetch('/instances');
+            renderInstances(data);
+        } catch (e) {
+            if (notifyOnError) toast(e.message, 'error', 'Error al recargar', 0);
+        } finally {
+            pollInFlight = false;
+        }
+    }
+
+    const ACTION_LABELS = {
+        start: { url: '/instances/start', verb: 'Activación' },
+        stop:  { url: '/instances/stop',  verb: 'Apagado' },
+    };
+
+    async function actionInstance(safeHost, action) {
+        const host = decodeURIComponent(safeHost);
+        const cfg = ACTION_LABELS[action];
+        try {
+            await jsonFetch(cfg.url + '?host_name=' + safeHost, { method: 'POST' });
+            toast(cfg.verb + ' en curso para ' + host + '.', 'info');
+            loadInstances();
+        } catch (e) {
+            toast(e.message, 'error', cfg.verb + ' fallido', 0);
+        }
+    }
+
+    async function deleteInstance(safeHost) {
+        const host = decodeURIComponent(safeHost);
+        if (!confirm('¿Eliminar la instancia "' + host + '"?\n\nSe apagará la VM, se borrará su disco diferencial, el registro DNS y todos los archivos asociados. Esta acción no se puede deshacer.')) return;
+        try {
+            await jsonFetch('/instances?host_name=' + safeHost, { method: 'DELETE' });
+            toast('Eliminación en curso para ' + host + '. Desaparecerá de la tabla cuando termine.', 'warning');
+            loadInstances();
+        } catch (e) {
+            toast(e.message, 'error', 'Eliminación fallida', 0);
+        }
+    }
+
+    loadInstances();
 </script>
 
 </body>

@@ -238,6 +238,19 @@ func StopVM(vmName string) error {
 	return nil
 }
 
+// ForcePowerOffVM yanks the power on a VM whose guest didn't honor the ACPI
+// shutdown event (typically because acpid isn't installed in the guest).
+// Equivalent to pulling the cable. Returns nil if the VM was already off.
+func ForcePowerOffVM(vmName string) error {
+	if out, err := RunVBoxManage("controlvm", vmName, "poweroff"); err != nil {
+		if strings.Contains(out, "is not currently running") {
+			return nil
+		}
+		return fmt.Errorf("controlvm poweroff %s: %v - %s", vmName, err, out)
+	}
+	return nil
+}
+
 // UnregisterVM powers off the VM and removes it together with its disks.
 func UnregisterVM(vmName string) error {
 	if out, err := RunVBoxManage("controlvm", vmName, "poweroff"); err != nil {
