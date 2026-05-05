@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"httpaas-manager/config"
@@ -16,6 +17,11 @@ import (
 )
 
 var Cfg config.Config
+
+// provisionMu serializes the boot-time configuration of new VMs because every
+// fresh instance comes up on Cfg.TemplateInitialIP before being reassigned its
+// final static IP. Concurrent provisioning would collide on that shared IP.
+var provisionMu sync.Mutex
 
 func Init(cfg config.Config) {
 	Cfg = cfg
@@ -82,16 +88,22 @@ func CreateInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := services.CloneApacheVM(services.VMConfig{
-		VMName:         vmName,
-		TemplateVMName: Cfg.TemplateVMName,
-		HostOnlyIF:     Cfg.HostOnlyIF,
+	provisionMu.Lock()
+	if err := services.CreateApacheVM(services.VMConfig{
+		VMName:      vmName,
+		BaseVDIPath: Cfg.BaseVDIPath,
+		HostOnlyIF:  Cfg.HostOnlyIF,
+		MemoryMB:    Cfg.VMMemoryMB,
+		CPUs:        Cfg.VMCPUs,
+		OSType:      Cfg.VMOSType,
 	}); err != nil {
+		provisionMu.Unlock()
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	if err := waitForSSH(Cfg.TemplateInitialIP, Cfg.SSHUser); err != nil {
+		provisionMu.Unlock()
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -99,14 +111,17 @@ func CreateInstance(w http.ResponseWriter, r *http.Request) {
 	if err := services.ConfigureClone(
 		Cfg.TemplateInitialIP, Cfg.SSHUser, hostName, staticIP, Cfg.IPPrefix,
 	); err != nil {
+		provisionMu.Unlock()
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
 	if err := waitForSSH(staticIP, Cfg.SSHUser); err != nil {
+		provisionMu.Unlock()
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
+	provisionMu.Unlock()
 
 	if err := services.AddDNSRecord(services.DNSConfig{
 		Host: Cfg.DNSAuthoritativeIP,
@@ -120,6 +135,10 @@ func CreateInstance(w http.ResponseWriter, r *http.Request) {
 	if err := services.DeployZipToApache(staticIP, Cfg.SSHUser, localZipPath); err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
+	}
+
+	if err := os.Remove(localZipPath); err != nil && !os.IsNotExist(err) {
+		fmt.Printf("warning: could not remove %s: %v\n", localZipPath, err)
 	}
 
 	instance := models.WebInstance{
@@ -257,12 +276,26 @@ func StopInstance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, _, err := storage.UpdateInstanceStatus(hostName, "stopped")
+	updated, _, err := storage.UpdateInstanceStatus(hostName, "stopping")
 	if err != nil {
 		utils.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	utils.WriteJSON(w, http.StatusOK, updated)
+
+	go func(vm, host string) {
+		deadline := time.Now().Add(2 * time.Minute)
+		for time.Now().Before(deadline) {
+			state, err := services.VMState(vm)
+			if err == nil && state == "poweroff" {
+				storage.UpdateInstanceStatus(host, "stopped")
+				return
+			}
+			time.Sleep(3 * time.Second)
+		}
+		storage.UpdateInstanceStatus(host, "stopped")
+	}(target.VMName, hostName)
+
+	utils.WriteJSON(w, http.StatusAccepted, updated)
 }
 
 func waitForSSH(ip string, user string) error {

@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 )
 
@@ -41,6 +42,11 @@ type Config struct {
 	IPStart  int
 
 	TemplateInitialIP string
+
+	BaseVDIPath string
+	VMMemoryMB  int
+	VMCPUs      int
+	VMOSType    string
 }
 
 func Load() Config {
@@ -67,6 +73,11 @@ func Load() Config {
 		IPStart:  IPStart,
 
 		TemplateInitialIP: getEnv("TEMPLATE_INITIAL_IP", "192.168.10.20"),
+
+		BaseVDIPath: getEnv("BASE_VDI_PATH", `C:\Users\Orlay Molina\VirtualBox VMs\debian-web1.vdi`),
+		VMMemoryMB:  getInt("VM_MEMORY_MB", 1024),
+		VMCPUs:      getInt("VM_CPUS", 1),
+		VMOSType:    getEnv("VM_OSTYPE", "Debian_64"),
 	}
 }
 
@@ -84,6 +95,15 @@ func getBool(key string, def bool) bool {
 		return true
 	case "0", "false", "no", "n", "off":
 		return false
+	}
+	return def
+}
+
+func getInt(key string, def int) int {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

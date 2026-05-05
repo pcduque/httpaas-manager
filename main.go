@@ -1,8 +1,10 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"net/http"
+	"os"
 
 	"httpaas-manager/config"
 	"httpaas-manager/handlers"
@@ -24,9 +26,32 @@ func instancesRoute(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	multiattach := flag.Bool("multiattach", false, "convert the base VDI to multi-attach mode and exit")
+	flag.Parse()
+
 	cfg := config.Load()
 	services.InitVBox(cfg)
 	handlers.Init(cfg)
+
+	if *multiattach {
+		changed, err := services.EnsureMultiAttachBase(cfg.BaseVDIPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "multi-attach conversion failed: %v\n", err)
+			os.Exit(1)
+		}
+		if changed {
+			fmt.Printf("Base VDI %s set to multi-attach.\n", cfg.BaseVDIPath)
+		} else {
+			fmt.Printf("Base VDI %s already in multi-attach mode.\n", cfg.BaseVDIPath)
+		}
+		return
+	}
+
+	if changed, err := services.EnsureMultiAttachBase(cfg.BaseVDIPath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not verify multi-attach base: %v\n", err)
+	} else if changed {
+		fmt.Printf("Base VDI %s set to multi-attach.\n", cfg.BaseVDIPath)
+	}
 
 	http.HandleFunc("/instances", instancesRoute)
 	http.HandleFunc("/instances/start", func(w http.ResponseWriter, r *http.Request) {

@@ -48,6 +48,7 @@
         .badge-running { background: #d4edda; color: #155724; }
         .badge-stopped { background: #f8d7da; color: #721c24; }
         .badge-starting { background: #fff3cd; color: #856404; }
+        .badge-stopping { background: #fff3cd; color: #856404; }
         button.danger { background: #c0392b; }
         button.warn { background: #d68910; }
         button:disabled { background: #aaa; cursor: not-allowed; }
@@ -88,6 +89,7 @@ async function createInstance() {
     formData.append('host_name', hostName);
     formData.append('site_zip', fileInput.files[0]);
 
+    if (createResultTimer) { clearTimeout(createResultTimer); createResultTimer = null; }
     show('create_result', 'Provisionando ' + hostName + '...');
     try {
         const res = await fetch('/instances', { method: 'POST', body: formData });
@@ -96,6 +98,10 @@ async function createInstance() {
         if (res.ok) {
             document.getElementById('host_name').value = '';
             fileInput.value = '';
+            createResultTimer = setTimeout(() => {
+                show('create_result', '');
+                createResultTimer = null;
+            }, 5000);
         }
         loadInstances();
     } catch (e) {
@@ -103,13 +109,14 @@ async function createInstance() {
     }
 }
 
-let startingPollTimer = null;
+let transientPollTimer = null;
+let createResultTimer = null;
 
 function renderInstances(list) {
     const container = document.getElementById('instances_table');
     if (!Array.isArray(list) || list.length === 0) {
         container.innerHTML = '<p>No hay instancias.</p>';
-        ensureStartingPoll(list);
+        ensureTransientPoll(list);
         return;
     }
     const rows = list.map(ins => {
@@ -117,8 +124,11 @@ function renderInstances(list) {
         let badgeClass = 'badge-stopped';
         if (status === 'running') badgeClass = 'badge-running';
         else if (status === 'starting') badgeClass = 'badge-starting';
-        const isTransient = status === 'starting';
-        const label = isTransient ? 'iniciando (puede tardar 2-3 min)' : status;
+        else if (status === 'stopping') badgeClass = 'badge-stopping';
+        const isTransient = status === 'starting' || status === 'stopping';
+        let label = status;
+        if (status === 'starting') label = 'iniciando (puede tardar 2-3 min)';
+        else if (status === 'stopping') label = 'deteniendo...';
         const startDisabled = (status === 'running' || isTransient) ? 'disabled' : '';
         const stopDisabled = (status === 'stopped' || isTransient) ? 'disabled' : '';
         const safe = encodeURIComponent(ins.hostname);
@@ -138,16 +148,19 @@ function renderInstances(list) {
         <thead><tr><th>Host</th><th>IP</th><th>VM</th><th>Estado</th><th>Acciones</th></tr></thead>
         <tbody>${rows}</tbody>
     </table>`;
-    ensureStartingPoll(list);
+    ensureTransientPoll(list);
 }
 
-function ensureStartingPoll(list) {
-    const hasStarting = Array.isArray(list) && list.some(i => (i.status || '') === 'starting');
-    if (hasStarting && !startingPollTimer) {
-        startingPollTimer = setInterval(loadInstances, 5000);
-    } else if (!hasStarting && startingPollTimer) {
-        clearInterval(startingPollTimer);
-        startingPollTimer = null;
+function ensureTransientPoll(list) {
+    const hasTransient = Array.isArray(list) && list.some(i => {
+        const s = i.status || '';
+        return s === 'starting' || s === 'stopping';
+    });
+    if (hasTransient && !transientPollTimer) {
+        transientPollTimer = setInterval(loadInstances, 5000);
+    } else if (!hasTransient && transientPollTimer) {
+        clearInterval(transientPollTimer);
+        transientPollTimer = null;
     }
 }
 
