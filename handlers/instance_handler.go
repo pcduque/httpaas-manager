@@ -161,7 +161,7 @@ func provisionInstance(ins models.WebInstance, zipPath string) error {
 	}
 
 	if err := services.ConfigureClone(
-		Cfg.TemplateInitialIP, Cfg.SSHUser, ins.HostName, ins.IP, Cfg.IPPrefix,
+		Cfg.TemplateInitialIP, Cfg.SSHUser, ins.HostName, ins.IP, Cfg.IPPrefix, Cfg.Domain,
 	); err != nil {
 		provisionMu.Unlock()
 		return err

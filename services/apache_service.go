@@ -14,15 +14,24 @@ import (
 // initialIP bound (so this very SSH session doesn't get killed). The persistent
 // config is written for future reboots, and the old IP is dropped in a detached
 // subshell after the SSH session returns.
-func ConfigureClone(initialIP, sshUser, hostName, staticIP, prefix string) error {
+func ConfigureClone(initialIP, sshUser, hostName, staticIP, prefix, domain string) error {
 	_ = prefix
 	cfg := SSHConfig{User: sshUser, Host: initialIP}
+
+	fqdn := hostName + "." + strings.TrimSuffix(strings.TrimSpace(domain), ".")
 
 	cmd := SudoPrelude() + fmt.Sprintf(`set -e
 sudo ip addr add %s/24 dev enp0s3 2>/dev/null || true
 
 echo '%s' | sudo tee /etc/hostname >/dev/null
-sudo hostnamectl set-hostname %s
+sudo hostname -F /etc/hostname
+sudo hostnamectl set-hostname %s 2>/dev/null || true
+
+ACTUAL_HOSTNAME=$(hostname)
+if [ "$ACTUAL_HOSTNAME" != "%s" ]; then
+    echo "ERROR: hostname is '$ACTUAL_HOSTNAME' after change, expected '%s'" >&2
+    exit 1
+fi
 
 if grep -qE '^127\.0\.1\.1' /etc/hosts; then
     sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1 %s/" /etc/hosts
@@ -43,7 +52,7 @@ NETEOF
 (sleep 5 && sudo ip addr del %s/24 dev enp0s3 2>/dev/null) &
 disown 2>/dev/null || true
 exit 0
-`, staticIP, hostName, hostName, hostName, hostName, staticIP, initialIP)
+`, staticIP, fqdn, fqdn, fqdn, fqdn, hostName, hostName, staticIP, initialIP)
 
 	if output, err := RunSSHCommand(cfg, cmd); err != nil {
 		return fmt.Errorf("configure clone (hostname/IP): %v - output: %s", err, output)
