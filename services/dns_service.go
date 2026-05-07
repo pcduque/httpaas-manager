@@ -22,7 +22,7 @@ func AddDNSRecord(cfg DNSConfig, hostName string, ipAddress string) error {
 server 127.0.0.1
 zone %s.
 update delete %s A
-update add %s 300 A %s
+update add %s 60 A %s
 send
 EOF`, zone, fqdn, fqdn, ipAddress)
 

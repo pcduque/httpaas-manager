@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "hostname": "paisaje",
+    "ip": "192.168.10.30",
+    "vm_name": "paisaje",
+    "created_at": "2026-05-06T23:25:11-05:00",
+    "status": "creating"
+  }
+]

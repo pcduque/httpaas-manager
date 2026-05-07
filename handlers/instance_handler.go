@@ -275,6 +275,13 @@ func StartInstance(w http.ResponseWriter, r *http.Request) {
 			storage.UpdateInstanceStatus(host, "stopped")
 			return
 		}
+		if err := services.AddDNSRecord(services.DNSConfig{
+			Host: Cfg.DNSAuthoritativeIP,
+			User: Cfg.DNSSSHUser,
+			Zone: Cfg.Domain,
+		}, host, ip); err != nil {
+			fmt.Printf("add dns %s on start: %v\n", host, err)
+		}
 		storage.UpdateInstanceStatus(host, "running")
 	}(target.IP, hostName)
 
@@ -315,31 +322,44 @@ func StopInstance(w http.ResponseWriter, r *http.Request) {
 
 	go func(vm, host string) {
 		powerDownAndConfirm(vm)
+		if err := services.RemoveDNSRecord(services.DNSConfig{
+			Host: Cfg.DNSAuthoritativeIP,
+			User: Cfg.DNSSSHUser,
+			Zone: Cfg.Domain,
+		}, host); err != nil {
+			fmt.Printf("remove dns %s on stop: %v\n", host, err)
+		}
 		storage.UpdateInstanceStatus(host, "stopped")
 	}(target.VMName, hostName)
 
 	utils.WriteJSON(w, http.StatusAccepted, updated)
 }
 
-// powerDownAndConfirm waits up to 30 s for ACPI shutdown to complete, then
-// forces a hard poweroff if the guest didn't honor the ACPI event (common when
-// acpid is missing in the guest). Returns when VBox reports the VM as off.
+// powerDownAndConfirm waits up to 5 s for ACPI shutdown to complete, then
+// forces a hard poweroff so Apache stops serving without a long stale window.
+// The short ACPI window matters because templates without acpid never honor
+// the soft event, so any delay here is pure dead time during which the site
+// keeps responding after the user clicked "Desactivar".
 func powerDownAndConfirm(vmName string) {
-	deadline := time.Now().Add(30 * time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
 		if state, _ := services.VMState(vmName); state == "poweroff" {
 			return
 		}
-		time.Sleep(2 * time.Second)
+		time.Sleep(500 * time.Millisecond)
+	}
+	if state, _ := services.VMState(vmName); state == "poweroff" {
+		return
 	}
 	if err := services.ForcePowerOffVM(vmName); err != nil {
 		fmt.Printf("force poweroff %s: %v\n", vmName, err)
 	}
-	for i := 0; i < 5; i++ {
-		time.Sleep(2 * time.Second)
+	confirmDeadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(confirmDeadline) {
 		if state, _ := services.VMState(vmName); state == "poweroff" {
 			return
 		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
