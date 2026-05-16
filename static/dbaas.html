@@ -668,30 +668,16 @@
              +  '</div>';
 
         if (ins.engine === 'mariadb') {
-            const sshLine = 'ssh ' + SSH_USER + '@' + ip
-                          + ' "mysql -h 127.0.0.1 -P ' + port + ' -u ' + user + ' -p\'' + pass + '\' ' + db + '"';
             const directLine = 'mysql -h ' + ip + ' -P ' + port + ' -u ' + user + ' -p\'' + pass + '\' ' + db;
-            html += '<h4>One-liner desde tu shell (vía SSH al VM)</h4>';
-            html += '<p class="desc">Usa el cliente <code>mysql</code> que ya está dentro de la VM, no necesitas instalarlo en el host.</p>';
-            html += snippetHTML('snip_ssh_' + ins.hostname, sshLine);
-            html += '<h4>Directo (si tenés <code>mysql</code> en tu host)</h4>';
-            html += '<p class="desc">Requiere instalar el cliente MariaDB/MySQL en Windows (ej. <code>winget install MariaDB.Server</code>).</p>';
+            html += '<h4>Comando para conectarse</h4>';
+            html += '<p class="desc">Requiere el cliente MariaDB/MySQL en tu host (ej. <code>winget install MariaDB.Server</code>).</p>';
             html += snippetHTML('snip_dir_' + ins.hostname, directLine);
         } else if (ins.engine === 'postgres') {
-            const sshLine = 'ssh ' + SSH_USER + '@' + ip
-                          + ' "PGPASSWORD=\'' + pass + '\' psql -h 127.0.0.1 -p ' + port + ' -U ' + user + ' -d ' + db + '"';
             const directLine = 'PGPASSWORD=\'' + pass + '\' psql -h ' + ip + ' -p ' + port + ' -U ' + user + ' -d ' + db;
-            html += '<h4>One-liner desde tu shell (vía SSH al VM)</h4>';
-            html += '<p class="desc">Usa el cliente <code>psql</code> que ya viene con el paquete <code>postgresql</code> dentro de la VM.</p>';
-            html += snippetHTML('snip_ssh_' + ins.hostname, sshLine);
-            html += '<h4>Directo (si tenés <code>psql</code> en tu host)</h4>';
-            html += '<p class="desc">Requiere instalar el cliente PostgreSQL en Windows (ej. <code>winget install PostgreSQL.PostgreSQL</code>).</p>';
+            html += '<h4>Comando para conectarse</h4>';
+            html += '<p class="desc">Requiere el cliente PostgreSQL en tu host (ej. <code>winget install PostgreSQL.PostgreSQL</code>).</p>';
             html += snippetHTML('snip_dir_' + ins.hostname, directLine);
         }
-
-        html += '<h4>SSH a la VM (para tareas administrativas)</h4>';
-        html += '<p class="desc">Password fallback: <code>1234567</code> si no tenés llave SSH.</p>';
-        html += snippetHTML('snip_ssh_only_' + ins.hostname, 'ssh ' + SSH_USER + '@' + ip);
 
         return html;
     }

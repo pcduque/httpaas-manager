@@ -71,7 +71,7 @@ Servicio HTTP que corre en el host Windows porque debe invocar `VBoxManage.exe` 
 | `storage` | `db_instance_store.go` — persistencia JSON análoga a `instance_store.go` |
 | `services` | `db_service.go` (Configure MariaDB/Postgres + scoped grants + run user SQL), `template_service.go` (Prepare MariaDB/Postgres templates), helpers de SSH key auth y `SudoRunScript` |
 | `handlers` | `db_instance_handler.go` — endpoints multipart `/db-instances` |
-| `static` | `dbaas.html` — dashboard con tabla, modal de logs, modal "Conectar" con comandos copy-paste |
+| `static` | `dbaas.html` — dashboard con tabla, modal de logs, modal "Info" con comandos copy-paste |
 
 ### 4.2 Plantillas Debian preconfiguradas (multiconexión)
 
@@ -103,7 +103,7 @@ Convención de FQDN:
 
 - Formulario: motor, nombre del servidor, nombre de la BD, usuario, contraseña, `.sql` opcional.
 - Tabla de instancias: servidor, motor, BD, FQDN, IP:puerto, usuario, contraseña con botón "ver", estado, fecha.
-- Acciones por instancia: **Conectar** (modal con comandos `mysql`/`psql` listos para copy-paste y datos para DBeaver), **Logs** (pipeline completo de provisioning), **Eliminar**.
+- Acciones por instancia: **Info** (modal con datos de conexión para DBeaver y el comando `mysql`/`psql` listo para copy-paste contra la IP/puerto de la VM), **Logs** (pipeline completo de provisioning), **Eliminar**.
 
 ---
 
@@ -242,7 +242,7 @@ ventas.mdb.cloud.local. 60 IN A 192.168.10.30
 
 ### 6.7 Verificación desde DBeaver / línea de comandos
 
-Datos de conexión visibles en el modal **Conectar** del dashboard:
+Datos de conexión visibles en el modal **Info** del dashboard:
 
 ```
 Host:     192.168.10.30   (o ventas.mdb.cloud.local si DNS apunta a 192.168.10.10)
@@ -252,7 +252,7 @@ User:     admin
 Password: 12345
 ```
 
-<<IMAGEN: Modal "Conectar" del dashboard con los comandos mysql/psql listos para copiar>>
+<<IMAGEN: Modal "Info" del dashboard con los datos para DBeaver y el comando mysql/psql listo para copiar>>
 <<IMAGEN: DBeaver conectado a 192.168.10.30:3306 mostrando las tablas de banco>>
 <<IMAGEN: Terminal ejecutando: ssh orlay@192.168.10.30 "mysql -h 127.0.0.1 -uadmin -p12345 banco -e 'SELECT * FROM clientes LIMIT 3;'" con resultados>>
 
