@@ -4,7 +4,16 @@ secrets.env
 # Go
 *.exe
 *.out
+*.exe~
 bin/
+
+# Runtime state
+instancias.json
+db_instancias.json
+uploads/
+db-uploads/
+*-prep.log
+manager-runtime.log
 
 # OS
 .DS_Store

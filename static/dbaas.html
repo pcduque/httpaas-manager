@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>DBaaS Manager</title>
+    <style>
+        :root {
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --text: #0f172a;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #10b981;
+            --success-hover: #059669;
+            --warning: #f59e0b;
+            --warning-hover: #d97706;
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --info: #0ea5e9;
+            --info-hover: #0284c7;
+            --shadow-sm: 0 1px 3px rgba(15, 23, 42, .08), 0 1px 2px rgba(15, 23, 42, .04);
+            --shadow-md: 0 4px 12px rgba(15, 23, 42, .08);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            font-size: 16px;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+        }
+        .header {
+            background: linear-gradient(135deg, #0f766e 0%, #134e4a 100%);
+            color: #fff;
+            padding: 28px 32px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .header h1 { margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+        .header .subtitle { margin: 4px 0 0; color: #d1fae5; font-size: 15px; }
+        .header nav a {
+            color: #fff;
+            text-decoration: none;
+            font-size: 14px;
+            padding: 6px 14px;
+            border: 1px solid rgba(255,255,255,.4);
+            border-radius: 999px;
+            transition: background .15s;
+        }
+        .header nav a:hover { background: rgba(255,255,255,.15); }
+        .container { max-width: 1280px; margin: 24px auto; padding: 0 24px; display: grid; gap: 20px; }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: var(--shadow-sm);
+            padding: 22px 24px;
+            border: 1px solid var(--border);
+        }
+        .card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+        .card .desc { color: var(--muted); font-size: 15px; margin: 0 0 16px; }
+
+        .form-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .form-row .field { display: flex; flex-direction: column; gap: 4px; }
+        .form-row label { font-size: 13px; color: var(--muted); font-weight: 500; }
+        input[type="text"], input[type="password"], select {
+            padding: 10px 13px;
+            font-size: 15px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+            color: var(--text);
+            transition: border-color .15s, box-shadow .15s;
+            font-family: inherit;
+            min-width: 200px;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, .15);
+        }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); cursor: pointer; }
+        .hidden { display: none !important; }
+
+        button {
+            padding: 10px 17px; font-size: 15px; font-weight: 500;
+            border: 0; border-radius: 8px;
+            background: var(--primary); color: #fff;
+            cursor: pointer; transition: background .15s, transform .05s;
+            font-family: inherit;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        button:hover { background: var(--primary-hover); }
+        button:active { transform: translateY(1px); }
+        button:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; transform: none; }
+        button.btn-success { background: var(--success); }
+        button.btn-success:hover:not(:disabled) { background: var(--success-hover); }
+        button.btn-warning { background: var(--warning); }
+        button.btn-warning:hover:not(:disabled) { background: var(--warning-hover); }
+        button.btn-info { background: var(--info); }
+        button.btn-info:hover:not(:disabled) { background: var(--info-hover); }
+        button.btn-danger { background: var(--danger); }
+        button.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
+        button.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        button.btn-ghost:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
+        button.btn-sm { padding: 7px 12px; font-size: 14px; }
+
+        .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 12px 14px; text-align: left; vertical-align: middle; }
+        th {
+            background: #f8fafc; color: var(--muted); font-weight: 600;
+            font-size: 12px; text-transform: uppercase; letter-spacing: .05em;
+            border-bottom: 1px solid var(--border);
+        }
+        tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
+        tbody tr:last-child { border-bottom: 0; }
+        tbody tr:hover { background: #f8fafc; }
+        td.host { font-weight: 600; color: var(--text); }
+        td.actions { white-space: nowrap; text-align: right; }
+        td.actions button { margin-left: 6px; }
+        td.actions button:first-child { margin-left: 0; }
+        .pill {
+            display: inline-flex; align-items: center; gap: 4px;
+            padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
+        }
+        .pill-mdb { background: #fef3c7; color: #92400e; }
+        .pill-pg  { background: #dbeafe; color: #1e3a8a; }
+        .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 13px; color: #334155; }
+        .secret { display: inline-flex; gap: 6px; align-items: center; }
+        .secret .pass { letter-spacing: 1px; }
+        .secret button { padding: 2px 8px; font-size: 11px; background: transparent; color: var(--muted); border: 1px solid var(--border); }
+        .secret button:hover { background: #f1f5f9; color: var(--text); }
+        a.admin-link { color: var(--primary); text-decoration: none; font-weight: 500; }
+        a.admin-link:hover { text-decoration: underline; }
+
+        .empty {
+            padding: 48px 20px; text-align: center; color: var(--muted); font-size: 15px;
+            border-radius: 10px; border: 1px dashed var(--border); background: #fafbfc;
+        }
+
+        .badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 5px 12px; border-radius: 999px;
+            font-size: 13px; font-weight: 600; white-space: nowrap;
+        }
+        .badge .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .badge-running { background: #d1fae5; color: #065f46; }
+        .badge-running .dot { background: var(--success); }
+        .badge-stopped { background: #fee2e2; color: #991b1b; }
+        .badge-stopped .dot { background: var(--danger); }
+        .badge-creating { background: #dbeafe; color: #1e40af; }
+        .badge-creating .dot { background: var(--primary); animation: pulse 1.4s infinite; }
+        .badge-transient { background: #fef3c7; color: #92400e; }
+        .badge-transient .dot { background: var(--warning); animation: pulse 1.4s infinite; }
+        .badge-deleting { background: #fee2e2; color: #991b1b; }
+        .badge-deleting .dot { background: var(--danger); animation: pulse 1.4s infinite; }
+        .badge-error { background: #fde68a; color: #78350f; }
+        .badge-error .dot { background: #b45309; }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .45; transform: scale(1.35); }
+        }
+
+        .meta-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+        .meta-bar .meta-info { color: var(--muted); font-size: 14px; }
+        .meta-bar h2 { margin: 0; }
+
+        .toast-container { position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; pointer-events: none; max-width: calc(100vw - 40px); }
+        .toast { background: var(--card); border: 1px solid var(--border); border-left: 4px solid var(--info); border-radius: 8px; box-shadow: var(--shadow-md); padding: 13px 17px; min-width: 280px; max-width: 400px; font-size: 15px; color: var(--text); pointer-events: auto; animation: slideIn .2s ease-out; }
+        .toast.success { border-left-color: var(--success); }
+        .toast.error { border-left-color: var(--danger); }
+        .toast.warning { border-left-color: var(--warning); }
+        .toast.info { border-left-color: var(--info); }
+        .toast .title { font-weight: 600; margin: 0 0 3px; font-size: 15px; }
+        .toast .body { color: var(--muted); font-size: 14px; margin: 0; white-space: pre-wrap; word-break: break-word; }
+        .toast.removing { animation: slideOut .2s ease-in forwards; }
+        @keyframes slideIn { from { transform: translateX(20px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(24px); opacity: 0; } }
+
+        .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .modal-backdrop { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: none; align-items: center; justify-content: center; z-index: 900; padding: 20px; }
+        .modal-backdrop.open { display: flex; }
+        .modal {
+            background: var(--card); border-radius: 12px; box-shadow: var(--shadow-md);
+            max-width: 760px; width: 100%; max-height: 80vh; display: flex; flex-direction: column;
+            border: 1px solid var(--border);
+        }
+        .modal header { padding: 18px 22px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .modal header h3 { margin: 0; font-size: 17px; }
+        .modal .log-body {
+            padding: 18px 22px; overflow-y: auto; flex: 1;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12.5px; color: #1e293b;
+            white-space: pre-wrap; word-break: break-word;
+            background: #f8fafc;
+        }
+        .modal footer { padding: 12px 22px; border-top: 1px solid var(--border); text-align: right; }
+        .modal .close-btn { background: transparent; color: var(--muted); border: 0; padding: 4px 8px; font-size: 20px; }
+
+        @media (max-width: 720px) {
+            .header { padding: 20px; }
+            .container { padding: 0 16px; margin: 18px auto; }
+            .card { padding: 18px; }
+            td.actions { text-align: left; }
+            td.actions button { margin: 2px 4px 2px 0; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <div>
+        <h1>DBaaS Manager</h1>
+        <p class="subtitle">Aprovisionamiento de instancias MariaDB y PostgreSQL sobre VirtualBox</p>
+    </div>
+    <nav><a href="/index.html">→ HTTPaaS</a></nav>
+</header>
+
+<main class="container">
+    <section class="card">
+        <h2>Crear nueva base de datos</h2>
+        <p class="desc">El manager clonará la plantilla del motor elegido, configurará hostname y red, registrará el host en BIND9 bajo <code>&lt;host&gt;.mdb.cloud.local</code> o <code>&lt;host&gt;.pg.cloud.local</code>, creará la base y el usuario solicitados, y opcionalmente ejecutará un .sql inicial.</p>
+
+        <div class="form-row" style="margin-bottom: 12px;">
+            <div class="field">
+                <label for="engine">Motor</label>
+                <select id="engine">
+                    <option value="mariadb">MariaDB</option>
+                    <option value="postgres">PostgreSQL</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="host_name">Nombre del servidor (VM)</label>
+                <input id="host_name" type="text" placeholder="ej: ventas" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="db_name">Nombre de la base de datos</label>
+                <input id="db_name" type="text" placeholder="ej: ventas_db" autocomplete="off">
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom: 12px;">
+            <div class="field">
+                <label for="db_user">Usuario de la base</label>
+                <input id="db_user" type="text" placeholder="ej: appuser" autocomplete="off">
+            </div>
+            <div class="field">
+                <label for="db_password">Contraseña</label>
+                <input id="db_password" type="password" placeholder="4-64 chars: a-z 0-9 . _ - ! @ # $" autocomplete="new-password">
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom: 12px;">
+            <div class="field" style="flex: 1; min-width: 320px;">
+                <label for="sql_file">Script SQL inicial (opcional, .sql)</label>
+                <input id="sql_file" type="file" accept=".sql">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <button id="create_btn" onclick="createDBInstance()">Crear base de datos</button>
+        </div>
+    </section>
+
+    <section class="card">
+        <div class="meta-bar">
+            <h2>Instancias aprovisionadas</h2>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <span class="meta-info" id="meta_info"></span>
+                <button class="btn-ghost btn-sm" onclick="loadDBInstances(true)">Recargar</button>
+            </div>
+        </div>
+        <div id="instances_table"></div>
+    </section>
+</main>
+
+<div class="toast-container" id="toasts"></div>
+
+<div class="modal-backdrop" id="logs_modal">
+    <div class="modal">
+        <header>
+            <h3 id="logs_title">Logs</h3>
+            <button class="close-btn" onclick="closeLogs()">×</button>
+        </header>
+        <div class="log-body" id="logs_body">Cargando...</div>
+        <footer><button class="btn-ghost btn-sm" onclick="closeLogs()">Cerrar</button></footer>
+    </div>
+</div>
+
+<script>
+    const TRANSIENT_STATES = new Set(['creating', 'starting', 'stopping', 'deleting', 'restarting']);
+
+    const STATUS_META = {
+        creating:   { label: 'creando',      cls: 'badge-creating',  hint: 'Clonando VM, instalando configuración y registrando DNS (≈ 2-5 min)' },
+        starting:   { label: 'iniciando',    cls: 'badge-transient', hint: 'Esperando SSH y reactivando registro DNS' },
+        stopping:   { label: 'deteniendo',   cls: 'badge-transient', hint: 'ACPI shutdown enviado; se forzará el apagado si no responde' },
+        restarting: { label: 'reiniciando',  cls: 'badge-transient', hint: 'Reboot en curso' },
+        deleting:   { label: 'eliminando',   cls: 'badge-deleting',  hint: 'Removiendo VM, DNS y registro' },
+        running:    { label: 'activa',       cls: 'badge-running',   hint: 'Instancia disponible y aceptando conexiones' },
+        stopped:    { label: 'detenida',     cls: 'badge-stopped',   hint: 'VM apagada' },
+        error:      { label: 'error',        cls: 'badge-error',     hint: 'Falló alguna operación; revisa los logs de la instancia' },
+    };
+
+    let pollTimer = null;
+    let pollInFlight = false;
+
+    function escapeHTML(str) {
+        return String(str || '').replace(/[&<>"']/g, c => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[c]));
+    }
+
+    function toast(message, kind, title, ttl) {
+        if (kind === undefined) kind = 'info';
+        if (ttl === undefined) ttl = 5000;
+        const container = document.getElementById('toasts');
+        const el = document.createElement('div');
+        el.className = 'toast ' + kind;
+        if (title) {
+            const t = document.createElement('p');
+            t.className = 'title';
+            t.textContent = title;
+            el.appendChild(t);
+        }
+        const b = document.createElement('p');
+        b.className = 'body';
+        b.textContent = message;
+        el.appendChild(b);
+        container.appendChild(el);
+        if (ttl > 0) setTimeout(() => dismissToast(el), ttl);
+        else {
+            el.style.cursor = 'pointer';
+            el.title = 'Click para cerrar';
+            el.addEventListener('click', () => dismissToast(el));
+        }
+    }
+    function dismissToast(el) {
+        if (!el.parentNode) return;
+        el.classList.add('removing');
+        setTimeout(() => el.remove(), 200);
+    }
+
+    async function jsonFetch(url, opts) {
+        const res = await fetch(url, opts);
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) {
+            const msg = (data && (data.error || data.message)) || res.statusText || 'request failed';
+            const err = new Error(msg);
+            err.status = res.status;
+            throw err;
+        }
+        return data;
+    }
+
+    async function createDBInstance() {
+        const engine = document.getElementById('engine').value;
+        const hostName = document.getElementById('host_name').value.trim();
+        const dbName = document.getElementById('db_name').value.trim();
+        const dbUser = document.getElementById('db_user').value.trim();
+        const dbPassword = document.getElementById('db_password').value;
+        const sqlInput = document.getElementById('sql_file');
+        const btn = document.getElementById('create_btn');
+
+        if (!hostName) { toast('Ingresa un nombre de servidor', 'warning'); return; }
+        if (!dbName) { toast('Ingresa el nombre de la base de datos', 'warning'); return; }
+        if (!dbUser) { toast('Ingresa un usuario', 'warning'); return; }
+        if (!dbPassword) { toast('Ingresa una contraseña', 'warning'); return; }
+
+        const formData = new FormData();
+        formData.append('host_name', hostName);
+        formData.append('engine', engine);
+        formData.append('db_name', dbName);
+        formData.append('db_user', dbUser);
+        formData.append('db_password', dbPassword);
+        if (sqlInput.files.length > 0) {
+            formData.append('sql_file', sqlInput.files[0]);
+        }
+
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Creando...';
+        try {
+            const data = await jsonFetch('/db-instances', {
+                method: 'POST',
+                body: formData,
+            });
+            toast('La instancia se está provisionando en segundo plano.', 'success', 'Aprovisionamiento iniciado: ' + data.hostname);
+            document.getElementById('host_name').value = '';
+            document.getElementById('db_name').value = '';
+            document.getElementById('db_user').value = '';
+            document.getElementById('db_password').value = '';
+            sqlInput.value = '';
+            loadDBInstances();
+        } catch (e) {
+            toast(e.message, 'error', 'No se pudo crear', 0);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Crear base de datos';
+        }
+    }
+
+    function enginePill(engine) {
+        if (engine === 'mariadb') return '<span class="pill pill-mdb">MariaDB</span>';
+        if (engine === 'postgres') return '<span class="pill pill-pg">PostgreSQL</span>';
+        return '<span class="pill">' + escapeHTML(engine) + '</span>';
+    }
+
+    function secretCell(value, id) {
+        return '<span class="secret"><span class="pass" id="' + id + '">••••••••</span>'
+             + '<button onclick="toggleSecret(\'' + id + '\', \'' + encodeURIComponent(value) + '\')">ver</button></span>';
+    }
+
+    function toggleSecret(id, encVal) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (el.dataset.shown === '1') {
+            el.textContent = '••••••••';
+            el.dataset.shown = '0';
+        } else {
+            el.textContent = decodeURIComponent(encVal);
+            el.dataset.shown = '1';
+        }
+    }
+
+    function renderDBInstances(list) {
+        const container = document.getElementById('instances_table');
+        const meta = document.getElementById('meta_info');
+        if (!Array.isArray(list) || list.length === 0) {
+            container.innerHTML = '<div class="empty">No hay instancias todavía. Crea la primera arriba.</div>';
+            meta.textContent = '';
+            ensurePolling(list);
+            return;
+        }
+
+        const counts = list.reduce((acc, i) => {
+            const s = i.status || 'running';
+            acc[s] = (acc[s] || 0) + 1;
+            return acc;
+        }, {});
+        const running = counts.running || 0;
+        const transient = list.filter(i => TRANSIENT_STATES.has(i.status || '')).length;
+        let metaText = list.length + ' total · ' + running + ' activa' + (running === 1 ? '' : 's');
+        if (transient > 0) metaText += ' · ' + transient + ' en transición';
+        meta.textContent = metaText;
+
+        const rows = list.map((ins, idx) => {
+            const status = ins.status || 'running';
+            const m = STATUS_META[status] || { label: status, cls: 'badge-stopped', hint: '' };
+
+            const deleteDis = (status === 'deleting') ? 'disabled' : '';
+
+            const safe = encodeURIComponent(ins.hostname);
+            const fqdn = ins.fqdn || (ins.hostname + '.cloud.local');
+            const created = (ins.created_at || '').replace('T', ' ').replace(/\..*$/, '');
+
+            return '<tr>'
+                + '<td class="host">' + escapeHTML(ins.hostname) + '</td>'
+                + '<td>' + enginePill(ins.engine) + '</td>'
+                + '<td class="mono">' + escapeHTML(ins.db_name || '') + '</td>'
+                + '<td class="mono">' + escapeHTML(fqdn) + '</td>'
+                + '<td class="mono">' + escapeHTML(ins.ip) + ':' + escapeHTML(String(ins.port || '')) + '</td>'
+                + '<td class="mono">' + escapeHTML(ins.db_user) + '</td>'
+                + '<td>' + secretCell(ins.db_password || '', 'pwd_' + idx) + '</td>'
+                + '<td><span class="badge ' + m.cls + '" title="' + escapeHTML(m.hint) + '"><span class="dot"></span>' + escapeHTML(m.label) + '</span></td>'
+                + '<td class="mono" style="color: var(--muted);">' + escapeHTML(created) + '</td>'
+                + '<td class="actions">'
+                +   '<button class="btn-ghost btn-sm" onclick="openLogs(\'' + safe + '\')">Logs</button>'
+                +   '<button class="btn-danger btn-sm" ' + deleteDis + ' onclick="deleteDB(\'' + safe + '\')">Eliminar</button>'
+                + '</td>'
+                + '</tr>';
+        }).join('');
+
+        container.innerHTML = '<div class="table-wrap"><table>'
+            + '<thead><tr>'
+            +   '<th>Servidor</th><th>Motor</th><th>BD</th><th>FQDN</th><th>Host:Puerto</th>'
+            +   '<th>Usuario</th><th>Contraseña</th>'
+            +   '<th>Estado</th><th>Creada</th><th></th>'
+            + '</tr></thead>'
+            + '<tbody>' + rows + '</tbody>'
+            + '</table></div>';
+        ensurePolling(list);
+    }
+
+    function ensurePolling(list) {
+        const hasTransient = Array.isArray(list) && list.some(i => TRANSIENT_STATES.has(i.status || ''));
+        if (hasTransient && !pollTimer) {
+            pollTimer = setInterval(() => loadDBInstances(false), 4000);
+        } else if (!hasTransient && pollTimer) {
+            clearInterval(pollTimer);
+            pollTimer = null;
+        }
+    }
+
+    async function loadDBInstances(notifyOnError) {
+        if (notifyOnError === undefined) notifyOnError = true;
+        if (pollInFlight) return;
+        pollInFlight = true;
+        try {
+            const data = await jsonFetch('/db-instances');
+            renderDBInstances(data);
+        } catch (e) {
+            if (notifyOnError) toast(e.message, 'error', 'Error al recargar', 0);
+        } finally {
+            pollInFlight = false;
+        }
+    }
+
+    const ACTION_LABELS = {
+        start:   { url: '/db-instances/start',   verb: 'Activación' },
+        stop:    { url: '/db-instances/stop',    verb: 'Apagado' },
+        restart: { url: '/db-instances/restart', verb: 'Reinicio' },
+    };
+
+    async function actionDB(safeHost, action) {
+        const host = decodeURIComponent(safeHost);
+        const cfg = ACTION_LABELS[action];
+        try {
+            await jsonFetch(cfg.url + '?host_name=' + safeHost, { method: 'POST' });
+            toast(cfg.verb + ' en curso para ' + host + '.', 'info');
+            loadDBInstances();
+        } catch (e) {
+            toast(e.message, 'error', cfg.verb + ' fallido', 0);
+        }
+    }
+
+    async function deleteDB(safeHost) {
+        const host = decodeURIComponent(safeHost);
+        if (!confirm('¿Eliminar la instancia "' + host + '"?\n\nSe apagará la VM, se borrará su disco diferencial, el registro DNS y todo el contenido de la base. Esta acción no se puede deshacer.')) return;
+        try {
+            await jsonFetch('/db-instances?host_name=' + safeHost, { method: 'DELETE' });
+            toast('Eliminación en curso para ' + host + '.', 'warning');
+            loadDBInstances();
+        } catch (e) {
+            toast(e.message, 'error', 'Eliminación fallida', 0);
+        }
+    }
+
+    async function openLogs(safeHost) {
+        const host = decodeURIComponent(safeHost);
+        document.getElementById('logs_title').textContent = 'Logs de ' + host;
+        document.getElementById('logs_body').textContent = 'Cargando...';
+        document.getElementById('logs_modal').classList.add('open');
+        try {
+            const data = await jsonFetch('/db-instances/logs?host_name=' + safeHost);
+            const logs = Array.isArray(data.logs) ? data.logs : [];
+            document.getElementById('logs_body').textContent = logs.length === 0
+                ? '(sin logs todavía)'
+                : logs.join('\n');
+        } catch (e) {
+            document.getElementById('logs_body').textContent = 'Error: ' + e.message;
+        }
+    }
+
+    function closeLogs() {
+        document.getElementById('logs_modal').classList.remove('open');
+    }
+
+    document.getElementById('logs_modal').addEventListener('click', e => {
+        if (e.target.id === 'logs_modal') closeLogs();
+    });
+
+    loadDBInstances();
+</script>
+
+</body>
+</html>

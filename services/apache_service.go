@@ -34,9 +34,9 @@ if [ "$ACTUAL_HOSTNAME" != "%s" ]; then
 fi
 
 if grep -qE '^127\.0\.1\.1' /etc/hosts; then
-    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1 %s/" /etc/hosts
+    sudo sed -i "s/^127\.0\.1\.1.*/127.0.1.1 %s %s/" /etc/hosts
 else
-    echo "127.0.1.1 %s" | sudo tee -a /etc/hosts >/dev/null
+    echo "127.0.1.1 %s %s" | sudo tee -a /etc/hosts >/dev/null
 fi
 
 sudo tee /etc/network/interfaces >/dev/null <<NETEOF
@@ -52,7 +52,7 @@ NETEOF
 (sleep 5 && sudo ip addr del %s/24 dev enp0s3 2>/dev/null) &
 disown 2>/dev/null || true
 exit 0
-`, staticIP, fqdn, fqdn, fqdn, fqdn, hostName, hostName, staticIP, initialIP)
+`, staticIP, fqdn, fqdn, fqdn, fqdn, fqdn, hostName, fqdn, hostName, staticIP, initialIP)
 
 	if output, err := RunSSHCommand(cfg, cmd); err != nil {
 		return fmt.Errorf("configure clone (hostname/IP): %v - output: %s", err, output)

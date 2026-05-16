@@ -47,6 +47,24 @@ type Config struct {
 	VMMemoryMB  int
 	VMCPUs      int
 	VMOSType    string
+
+	MariaDBBaseVDIPath  string
+	PostgresBaseVDIPath string
+	MariaDBPort         int
+	PostgresPort        int
+	DefaultDBUser       string
+	DefaultDBPassword   string
+
+	// DBRootPassword is the password baked into both DB templates for the
+	// engine's superuser (root@'%' for MariaDB, postgres role for PostgreSQL)
+	// so administrators can connect from anywhere on the host-only subnet.
+	DBRootPassword string
+
+	// GuestSSHKeyPath is the SSH private key the manager uses to log into
+	// guest VMs (template prep + provisioned instances). The matching public
+	// key is baked into /home/<SSHUser>/.ssh/authorized_keys at template prep
+	// time. Falls back to password auth if the key isn't loadable.
+	GuestSSHKeyPath string
 }
 
 func Load() Config {
@@ -78,6 +96,15 @@ func Load() Config {
 		VMMemoryMB:  getInt("VM_MEMORY_MB", 1024),
 		VMCPUs:      getInt("VM_CPUS", 1),
 		VMOSType:    getEnv("VM_OSTYPE", "Debian_64"),
+
+		MariaDBBaseVDIPath:  getEnv("MARIADB_BASE_VDI", `C:\Users\Orlay Molina\VirtualBox VMs\debian-mariadb.vdi`),
+		PostgresBaseVDIPath: getEnv("POSTGRES_BASE_VDI", `C:\Users\Orlay Molina\VirtualBox VMs\debian-postgres.vdi`),
+		MariaDBPort:         getInt("MARIADB_PORT", 3306),
+		PostgresPort:        getInt("POSTGRES_PORT", 5432),
+		DefaultDBUser:       getEnv("DB_DEFAULT_USER", "admin"),
+		DefaultDBPassword:   getEnv("DB_DEFAULT_PASSWORD", "admin123"),
+		DBRootPassword:      getEnv("DB_ROOT_PASSWORD", "root123"),
+		GuestSSHKeyPath:     getEnv("GUEST_SSH_KEY", expandHome("~/.ssh/id_ed25519")),
 	}
 }
 
@@ -106,4 +133,17 @@ func getInt(key string, def int) int {
 		}
 	}
 	return def
+}
+
+// expandHome replaces a leading "~/" with the current user's home directory.
+// Used for default config values that reference SSH keys.
+func expandHome(p string) string {
+	if !strings.HasPrefix(p, "~/") {
+		return p
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return p
+	}
+	return home + p[1:]
 }

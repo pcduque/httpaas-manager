@@ -288,6 +288,48 @@ func StartInstance(w http.ResponseWriter, r *http.Request) {
 	utils.WriteJSON(w, http.StatusAccepted, updated)
 }
 
+// RestartInstance cleanly reboots the VM via ACPI + start; the static IP and
+// DNS record stay intact so the site keeps responding under the same FQDN.
+func RestartInstance(w http.ResponseWriter, r *http.Request) {
+	hostName := strings.TrimSpace(r.URL.Query().Get("host_name"))
+	if hostName == "" {
+		utils.WriteError(w, http.StatusBadRequest, "host_name is required")
+		return
+	}
+	hostName = sanitizeHostName(hostName)
+
+	target, found, err := findInstance(hostName)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !found {
+		utils.WriteError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+
+	updated, _, err := storage.UpdateInstanceStatus(hostName, "starting")
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	go func(ins models.WebInstance) {
+		if err := services.RestartVM(ins.VMName); err != nil {
+			fmt.Printf("restart %s: %v\n", ins.VMName, err)
+			storage.UpdateInstanceStatus(ins.HostName, "error")
+			return
+		}
+		if err := waitForSSH(ins.IP, Cfg.SSHUser); err != nil {
+			storage.UpdateInstanceStatus(ins.HostName, "stopped")
+			return
+		}
+		storage.UpdateInstanceStatus(ins.HostName, "running")
+	}(target)
+
+	utils.WriteJSON(w, http.StatusAccepted, updated)
+}
+
 // StopInstance sends ACPI shutdown, waits up to ~30 s for the guest to power
 // itself off, then escalates to a forced VBox poweroff so the VM is reliably
 // off when the UI says "stopped".
