@@ -171,6 +171,11 @@ func provisionInstance(ins models.WebInstance, zipPath string) error {
 		provisionMu.Unlock()
 		return err
 	}
+
+	if err := services.DropInitialIPAlias(ins.IP, Cfg.SSHUser, Cfg.TemplateInitialIP); err != nil {
+		fmt.Printf("warning: drop initial IP alias on %s: %v\n", ins.HostName, err)
+	}
+
 	provisionMu.Unlock()
 
 	if err := services.AddDNSRecord(services.DNSConfig{

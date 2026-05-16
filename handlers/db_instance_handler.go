@@ -240,6 +240,15 @@ func provisionDBInstance(ins models.DBInstance, baseVDI, localSQLPath string) er
 	if err := waitForSSH(ins.IP, Cfg.SSHUser); err != nil {
 		return err
 	}
+
+	// Drop the template's initial IP alias from enp0s3 before releasing the
+	// mutex, otherwise this VM keeps answering on TemplateInitialIP and the
+	// next provision's SSH-on-template-IP step lands on the wrong host.
+	logStep("dropping initial IP alias " + Cfg.TemplateInitialIP)
+	if err := services.DropInitialIPAlias(ins.IP, Cfg.SSHUser, Cfg.TemplateInitialIP); err != nil {
+		logStep("warning: drop initial IP alias: " + err.Error())
+	}
+
 	dbProvisionMu.Unlock()
 	provisionLocked = false
 

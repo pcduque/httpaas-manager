@@ -209,6 +209,34 @@
         .modal footer { padding: 12px 22px; border-top: 1px solid var(--border); text-align: right; }
         .modal .close-btn { background: transparent; color: var(--muted); border: 0; padding: 4px 8px; font-size: 20px; }
 
+        .conn-block { padding: 18px 22px; overflow-y: auto; flex: 1; }
+        .conn-block h4 { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+        .conn-block h4:first-child { margin-top: 0; }
+        .conn-block .desc { margin: 0 0 6px; font-size: 13px; color: var(--muted); }
+        .snippet {
+            display: flex; align-items: stretch; gap: 0;
+            border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+            background: #0f172a;
+            margin-bottom: 4px;
+        }
+        .snippet pre {
+            flex: 1; margin: 0; padding: 10px 14px;
+            font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+            font-size: 12.5px; color: #f1f5f9;
+            white-space: pre-wrap; word-break: break-all; line-height: 1.55;
+            overflow-x: auto;
+        }
+        .snippet button {
+            background: #1e293b; color: #cbd5e1;
+            border: 0; border-left: 1px solid #334155;
+            padding: 0 14px; font-size: 12px; cursor: pointer;
+            transition: background .15s, color .15s;
+        }
+        .snippet button:hover { background: #334155; color: #fff; }
+        .snippet button.copied { background: var(--success); color: #fff; }
+        .kv-list { font-size: 13px; line-height: 1.7; }
+        .kv-list code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12.5px; }
+
         @media (max-width: 720px) {
             .header { padding: 20px; }
             .container { padding: 0 16px; margin: 18px auto; }
@@ -296,6 +324,17 @@
         </header>
         <div class="log-body" id="logs_body">Cargando...</div>
         <footer><button class="btn-ghost btn-sm" onclick="closeLogs()">Cerrar</button></footer>
+    </div>
+</div>
+
+<div class="modal-backdrop" id="conn_modal">
+    <div class="modal">
+        <header>
+            <h3 id="conn_title">Conexión</h3>
+            <button class="close-btn" onclick="closeConn()">×</button>
+        </header>
+        <div class="conn-block" id="conn_body"></div>
+        <footer><button class="btn-ghost btn-sm" onclick="closeConn()">Cerrar</button></footer>
     </div>
 </div>
 
@@ -476,6 +515,7 @@
                 + '<td><span class="badge ' + m.cls + '" title="' + escapeHTML(m.hint) + '"><span class="dot"></span>' + escapeHTML(m.label) + '</span></td>'
                 + '<td class="mono" style="color: var(--muted);">' + escapeHTML(created) + '</td>'
                 + '<td class="actions">'
+                +   '<button class="btn-dark btn-sm" onclick="openConn(\'' + safe + '\')">Info</button>'
                 +   '<button class="btn-ghost btn-sm" onclick="openLogs(\'' + safe + '\')">Logs</button>'
                 +   '<button class="btn-danger btn-sm" ' + deleteDis + ' onclick="deleteDB(\'' + safe + '\')">Eliminar</button>'
                 + '</td>'
@@ -569,6 +609,115 @@
 
     document.getElementById('logs_modal').addEventListener('click', e => {
         if (e.target.id === 'logs_modal') closeLogs();
+    });
+
+    // SSH user is the one that owns the guest VM (matches GUEST_SSH_USER on the
+    // server). We expose it as a constant so the snippet builder stays in sync
+    // if it ever changes.
+    const SSH_USER = 'orlay';
+
+    function snippetHTML(id, cmd) {
+        return '<div class="snippet">'
+             +   '<pre id="' + id + '">' + escapeHTML(cmd) + '</pre>'
+             +   '<button onclick="copySnippet(\'' + id + '\', this)">copiar</button>'
+             + '</div>';
+    }
+
+    function copySnippet(id, btn) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const text = el.textContent;
+        const restore = btn.textContent;
+        const showCopied = () => {
+            btn.textContent = 'copiado ✓';
+            btn.classList.add('copied');
+            setTimeout(() => { btn.textContent = restore; btn.classList.remove('copied'); }, 1500);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(showCopied, () => fallbackCopy(text, showCopied));
+        } else {
+            fallbackCopy(text, showCopied);
+        }
+    }
+    function fallbackCopy(text, onDone) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); onDone(); } catch (_) {}
+        document.body.removeChild(ta);
+    }
+
+    function buildConnectionView(ins) {
+        const ip = ins.ip;
+        const port = ins.port;
+        const db = ins.db_name;
+        const user = ins.db_user;
+        const pass = ins.db_password;
+        const fqdn = ins.fqdn;
+
+        let html = '<h4>Acceso desde DBeaver / cliente externo</h4>';
+        html += '<div class="kv-list">'
+             +    'Host: <code>' + escapeHTML(ip) + '</code> (o <code>' + escapeHTML(fqdn) + '</code> si tu DNS apunta a 192.168.10.10)<br>'
+             +    'Puerto: <code>' + port + '</code><br>'
+             +    'Base de datos: <code>' + escapeHTML(db) + '</code><br>'
+             +    'Usuario: <code>' + escapeHTML(user) + '</code><br>'
+             +    'Contraseña: <code>' + escapeHTML(pass) + '</code>'
+             +  '</div>';
+
+        if (ins.engine === 'mariadb') {
+            const sshLine = 'ssh ' + SSH_USER + '@' + ip
+                          + ' "mysql -h 127.0.0.1 -P ' + port + ' -u ' + user + ' -p\'' + pass + '\' ' + db + '"';
+            const directLine = 'mysql -h ' + ip + ' -P ' + port + ' -u ' + user + ' -p\'' + pass + '\' ' + db;
+            html += '<h4>One-liner desde tu shell (vía SSH al VM)</h4>';
+            html += '<p class="desc">Usa el cliente <code>mysql</code> que ya está dentro de la VM, no necesitas instalarlo en el host.</p>';
+            html += snippetHTML('snip_ssh_' + ins.hostname, sshLine);
+            html += '<h4>Directo (si tenés <code>mysql</code> en tu host)</h4>';
+            html += '<p class="desc">Requiere instalar el cliente MariaDB/MySQL en Windows (ej. <code>winget install MariaDB.Server</code>).</p>';
+            html += snippetHTML('snip_dir_' + ins.hostname, directLine);
+        } else if (ins.engine === 'postgres') {
+            const sshLine = 'ssh ' + SSH_USER + '@' + ip
+                          + ' "PGPASSWORD=\'' + pass + '\' psql -h 127.0.0.1 -p ' + port + ' -U ' + user + ' -d ' + db + '"';
+            const directLine = 'PGPASSWORD=\'' + pass + '\' psql -h ' + ip + ' -p ' + port + ' -U ' + user + ' -d ' + db;
+            html += '<h4>One-liner desde tu shell (vía SSH al VM)</h4>';
+            html += '<p class="desc">Usa el cliente <code>psql</code> que ya viene con el paquete <code>postgresql</code> dentro de la VM.</p>';
+            html += snippetHTML('snip_ssh_' + ins.hostname, sshLine);
+            html += '<h4>Directo (si tenés <code>psql</code> en tu host)</h4>';
+            html += '<p class="desc">Requiere instalar el cliente PostgreSQL en Windows (ej. <code>winget install PostgreSQL.PostgreSQL</code>).</p>';
+            html += snippetHTML('snip_dir_' + ins.hostname, directLine);
+        }
+
+        html += '<h4>SSH a la VM (para tareas administrativas)</h4>';
+        html += '<p class="desc">Password fallback: <code>1234567</code> si no tenés llave SSH.</p>';
+        html += snippetHTML('snip_ssh_only_' + ins.hostname, 'ssh ' + SSH_USER + '@' + ip);
+
+        return html;
+    }
+
+    async function openConn(safeHost) {
+        const host = decodeURIComponent(safeHost);
+        document.getElementById('conn_title').textContent = 'Conectarse a ' + host;
+        document.getElementById('conn_body').textContent = 'Cargando...';
+        document.getElementById('conn_modal').classList.add('open');
+        try {
+            const list = await jsonFetch('/db-instances');
+            const ins = (list || []).find(i => i.hostname === host);
+            if (!ins) {
+                document.getElementById('conn_body').textContent = 'Instancia no encontrada';
+                return;
+            }
+            document.getElementById('conn_body').innerHTML = buildConnectionView(ins);
+        } catch (e) {
+            document.getElementById('conn_body').textContent = 'Error: ' + e.message;
+        }
+    }
+    function closeConn() {
+        document.getElementById('conn_modal').classList.remove('open');
+    }
+    document.getElementById('conn_modal').addEventListener('click', e => {
+        if (e.target.id === 'conn_modal') closeConn();
     });
 
     loadDBInstances();

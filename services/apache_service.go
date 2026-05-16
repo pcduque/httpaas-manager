@@ -49,13 +49,28 @@ iface enp0s3 inet static
     netmask 255.255.255.0
 NETEOF
 
-(sleep 5 && sudo ip addr del %s/24 dev enp0s3 2>/dev/null) &
-disown 2>/dev/null || true
 exit 0
-`, staticIP, fqdn, fqdn, fqdn, fqdn, fqdn, hostName, fqdn, hostName, staticIP, initialIP)
+`, staticIP, fqdn, fqdn, fqdn, fqdn, fqdn, hostName, fqdn, hostName, staticIP)
 
 	if output, err := RunSSHCommand(cfg, cmd); err != nil {
 		return fmt.Errorf("configure clone (hostname/IP): %v - output: %s", err, output)
+	}
+	return nil
+}
+
+// DropInitialIPAlias removes the template's initial IP from enp0s3 on the
+// freshly-configured VM. Must be called AFTER SSH is reachable on the static
+// IP — otherwise we'd kill our own session by dropping the IP we connected
+// over. This is the cleanup step we used to inline as a backgrounded
+// `(sleep 5 && ip addr del …) &` inside ConfigureClone, but that was racy:
+// the background process got reaped before it ran in many cases, leaving
+// freshly-provisioned VMs answering on BOTH the static IP and the shared
+// initial IP, and stealing SSH from subsequent provisions.
+func DropInitialIPAlias(targetIP, sshUser, initialIP string) error {
+	sshCfg := SSHConfig{User: sshUser, Host: targetIP}
+	cmd := SudoBashWrap(fmt.Sprintf("ip addr del %s/24 dev enp0s3 2>/dev/null || true", initialIP))
+	if output, err := RunSSHCommand(sshCfg, cmd); err != nil {
+		return fmt.Errorf("drop initial IP %s on %s: %v - output: %s", initialIP, targetIP, err, output)
 	}
 	return nil
 }
