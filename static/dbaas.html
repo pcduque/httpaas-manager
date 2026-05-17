@@ -113,6 +113,7 @@
         button.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
         button.btn-ghost:hover:not(:disabled) { background: #f8fafc; border-color: #cbd5e1; }
         button.btn-sm { padding: 7px 12px; font-size: 14px; }
+        button.btn-engine { width: 115px; padding-left: 6px; padding-right: 6px; }
 
         .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
@@ -516,8 +517,14 @@
                 + '<td class="mono" style="color: var(--muted);">' + escapeHTML(created) + '</td>'
                 + '<td class="actions">'
                 +   '<button class="btn-dark btn-sm" onclick="openConn(\'' + safe + '\')">Info</button>'
+                +   (ins.engine === 'postgres'
+                        ? '<button class="btn-info btn-sm btn-engine" onclick="registerInDBeaver(\'' + safe + '\')">DBeaver</button>'
+                        : '')
+                +   (ins.engine === 'mariadb'
+                        ? '<button class="btn-info btn-sm btn-engine" onclick="openPhpMyAdmin(\'' + encodeURIComponent(ins.ip) + '\')">phpMyAdmin</button>'
+                        : '')
                 +   '<button class="btn-ghost btn-sm" onclick="openLogs(\'' + safe + '\')">Logs</button>'
-                +   '<button class="btn-danger btn-sm" ' + deleteDis + ' onclick="deleteDB(\'' + safe + '\')">Eliminar</button>'
+                +   '<button class="btn-danger btn-sm" ' + deleteDis + ' onclick="deleteDB(\'' + safe + '\', \'' + ins.engine + '\')">Eliminar</button>'
                 + '</td>'
                 + '</tr>';
         }).join('');
@@ -575,16 +582,34 @@
         }
     }
 
-    async function deleteDB(safeHost) {
+    async function deleteDB(safeHost, engine) {
         const host = decodeURIComponent(safeHost);
         if (!confirm('¿Eliminar la instancia "' + host + '"?\n\nSe apagará la VM, se borrará su disco diferencial, el registro DNS y todo el contenido de la base. Esta acción no se puede deshacer.')) return;
         try {
             await jsonFetch('/db-instances?host_name=' + safeHost, { method: 'DELETE' });
             toast('Eliminación en curso para ' + host + '.', 'warning');
+            if (engine === 'postgres') {
+                toast('La conexión "' + host + ' (DBaaS)" sigue registrada en DBeaver. Bórrala manualmente desde el panel de Database Navigator para que no quede apuntando a una IP muerta.', 'info', 'Recuerda limpiar DBeaver', 0);
+            }
             loadDBInstances();
         } catch (e) {
             toast(e.message, 'error', 'Eliminación fallida', 0);
         }
+    }
+
+    async function registerInDBeaver(safeHost) {
+        const host = decodeURIComponent(safeHost);
+        try {
+            const data = await jsonFetch('/db-instances/dbeaver?host_name=' + safeHost, { method: 'POST' });
+            toast('Conexión "' + (data.name || host) + '" enviada a DBeaver. Revisa la app para verla en el árbol.', 'success', 'Registrada en DBeaver');
+        } catch (e) {
+            toast(e.message, 'error', 'No se pudo registrar en DBeaver', 0);
+        }
+    }
+
+    function openPhpMyAdmin(safeIP) {
+        const ip = decodeURIComponent(safeIP);
+        window.open('http://' + ip + '/phpmyadmin', '_blank', 'noopener');
     }
 
     async function openLogs(safeHost) {

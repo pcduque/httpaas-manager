@@ -130,6 +130,7 @@ func main() {
 	http.HandleFunc("/db-instances/stop", postOnly(handlers.StopDBInstance))
 	http.HandleFunc("/db-instances/restart", postOnly(handlers.RestartDBInstance))
 	http.HandleFunc("/db-instances/logs", getOnly(handlers.GetDBInstanceLogs))
+	http.HandleFunc("/db-instances/dbeaver", postOnly(handlers.RegisterInDBeaver))
 
 	fs := http.FileServer(http.Dir("./static"))
 	http.Handle("/", fs)

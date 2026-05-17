@@ -97,6 +97,72 @@ MARIADB_EOF
 	return runUserSQLMariaDB(spec)
 }
 
+// EnsurePhpMyAdmin installs Apache + PHP + phpMyAdmin on a freshly-provisioned
+// MariaDB VM if they aren't already present. Idempotent: apt-get install on
+// already-installed packages is a no-op (~1 s), so when the multi-attach
+// template has been rebuilt with phpMyAdmin baked in this becomes essentially
+// free. When the template doesn't have it (default state of pre-existing
+// templates), this brings the VM up to spec automatically.
+//
+// Requires the VM to have a NAT NIC (nic2 nat) attached and reachable; the
+// NAT bring-up snippet inside the script handles PCI rescan, dhcp, and a
+// static-IP fallback against VBox NAT defaults. Debconf is pre-seeded so the
+// phpmyadmin install runs fully unattended.
+//
+// The script runs as root via SudoRunScript to dodge sudo's credential cache.
+// Output is bounded — we don't stream apt's full chatter to the manager log,
+// only the final state and the success marker.
+func EnsurePhpMyAdmin(targetIP, sshUser, dbRootPassword string) error {
+	sshCfg := SSHConfig{User: sshUser, Host: targetIP}
+
+	body := fmt.Sprintf(`set -e
+export DEBIAN_FRONTEND=noninteractive
+
+# Short-circuit when phpmyadmin is already installed AND the apache conf is
+# enabled — re-runs after a template rebuild become near-instant no-ops.
+if dpkg -l phpmyadmin 2>/dev/null | grep -q '^ii' && [ -e /etc/apache2/conf-enabled/phpmyadmin.conf ]; then
+    echo "[phpmyadmin] already installed and enabled, skipping"
+    exit 0
+fi
+
+%s
+
+apt-get update
+apt-get install -y apache2 php php-mysql php-mbstring php-zip php-gd php-curl php-xml php-json libapache2-mod-php
+
+debconf-set-selections <<DEBCONF
+phpmyadmin phpmyadmin/dbconfig-install boolean false
+phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2
+phpmyadmin phpmyadmin/mysql/admin-user string root
+phpmyadmin phpmyadmin/mysql/admin-pass password %s
+phpmyadmin phpmyadmin/app-password-confirm password %s
+phpmyadmin phpmyadmin/mysql/app-pass password %s
+DEBCONF
+
+apt-get install -y phpmyadmin
+
+if [ -f /etc/phpmyadmin/apache.conf ] && [ ! -e /etc/apache2/conf-enabled/phpmyadmin.conf ]; then
+    ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-enabled/phpmyadmin.conf
+fi
+a2enmod rewrite || true
+a2enconf phpmyadmin || true
+
+systemctl enable apache2 || true
+systemctl restart apache2 || service apache2 restart
+echo "[phpmyadmin] ready"
+`,
+		natBringUpScript(),
+		sqlSingleQuoteEscape(dbRootPassword),
+		sqlSingleQuoteEscape(dbRootPassword),
+		sqlSingleQuoteEscape(dbRootPassword),
+	)
+
+	if output, err := RunSSHCommand(sshCfg, SudoRunScript(body)); err != nil {
+		return fmt.Errorf("install phpmyadmin on %s: %v - output: %s", targetIP, err, output)
+	}
+	return nil
+}
+
 // runUserSQLMariaDB uploads the user's .sql file to /tmp and runs it against
 // the newly-created database, authenticating as the per-instance user (proves
 // the credentials actually work end-to-end).

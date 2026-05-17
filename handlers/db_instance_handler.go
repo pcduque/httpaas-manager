@@ -218,6 +218,9 @@ func provisionDBInstance(ins models.DBInstance, baseVDI, localSQLPath string) er
 		MemoryMB:    Cfg.VMMemoryMB,
 		CPUs:        Cfg.VMCPUs,
 		OSType:      Cfg.VMOSType,
+		// MariaDB clones need outbound to apt-get phpMyAdmin during configure.
+		// Postgres clones don't need extra packages; keep them lean.
+		EnableNATNIC: ins.Engine == services.EngineMariaDB,
 	}); err != nil {
 		return err
 	}
@@ -274,6 +277,13 @@ func provisionDBInstance(ins models.DBInstance, baseVDI, localSQLPath string) er
 	case services.EngineMariaDB:
 		if err := services.ConfigureMariaDB(spec); err != nil {
 			return err
+		}
+		logStep("installing phpMyAdmin (may take a few minutes on first clone)")
+		if err := services.EnsurePhpMyAdmin(ins.IP, Cfg.SSHUser, Cfg.DBRootPassword); err != nil {
+			// Don't fail provisioning if phpMyAdmin install hiccups; the DB
+			// is already usable via TCP. Surface the failure in the log so
+			// the user can retry manually or check connectivity.
+			logStep("warning: phpMyAdmin install failed: " + err.Error())
 		}
 	case services.EnginePostgres:
 		if err := services.ConfigurePostgres(spec); err != nil {
@@ -483,6 +493,56 @@ func RestartDBInstance(w http.ResponseWriter, r *http.Request) {
 	}(target)
 
 	utils.WriteJSON(w, http.StatusAccepted, updated)
+}
+
+// RegisterInDBeaver pushes the instance's connection details into DBeaver via
+// its CLI (-con). Only valid for Postgres instances right now — MariaDB uses
+// the in-VM phpMyAdmin button instead. Returns 202 because launching the CLI
+// can be slow on a cold DBeaver process.
+func RegisterInDBeaver(w http.ResponseWriter, r *http.Request) {
+	hostName := sanitizeDBHostName(r.URL.Query().Get("host_name"))
+	if hostName == "" {
+		utils.WriteError(w, http.StatusBadRequest, "host_name is required")
+		return
+	}
+
+	target, found, err := findDBInstance(hostName)
+	if err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !found {
+		utils.WriteError(w, http.StatusNotFound, "instance not found")
+		return
+	}
+	if target.Engine != services.EnginePostgres {
+		utils.WriteError(w, http.StatusBadRequest, "DBeaver auto-registration is only enabled for postgres instances; use the phpMyAdmin button for MariaDB")
+		return
+	}
+	if target.Status != "running" {
+		utils.WriteError(w, http.StatusConflict, "instance must be running before registering it in DBeaver (current status: "+target.Status+")")
+		return
+	}
+
+	conn := services.DBeaverConnection{
+		Name:     fmt.Sprintf("%s (DBaaS)", target.HostName),
+		Driver:   "postgres-jdbc",
+		Host:     target.IP,
+		Port:     target.Port,
+		Database: target.DBName,
+		User:     target.DBUser,
+		Password: target.DBPassword,
+		Folder:   "DBaaS Manager",
+	}
+	if err := services.RegisterDBeaverConnection(conn); err != nil {
+		utils.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	utils.WriteJSON(w, http.StatusAccepted, map[string]string{
+		"registered": target.HostName,
+		"name":       conn.Name,
+	})
 }
 
 // GetDBInstanceLogs returns the stored pipeline log for a single instance,

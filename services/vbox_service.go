@@ -17,6 +17,13 @@ type VMConfig struct {
 	MemoryMB    int
 	CPUs        int
 	OSType      string
+
+	// EnableNATNIC adds a second NIC (nic2) attached to VBox NAT so the guest
+	// has outbound internet for apt-get during provisioning. Required for DB
+	// engines whose ConfigureXxx step installs extra packages (phpMyAdmin on
+	// MariaDB). Host-only on nic1 remains the inbound surface; NAT is one-way
+	// outbound so it doesn't change the security posture of the host-only net.
+	EnableNATNIC bool
 }
 
 type VBoxRunner struct {
@@ -142,6 +149,12 @@ func CreateVMFromBase(cfg VMConfig) error {
 		"--boot3", "none",
 		"--boot4", "none"); err != nil {
 		return fmt.Errorf("modifyvm: %v - %s", err, out)
+	}
+
+	if cfg.EnableNATNIC {
+		if out, err := RunVBoxManage("modifyvm", cfg.VMName, "--nic2", "nat"); err != nil {
+			return fmt.Errorf("modifyvm --nic2 nat: %v - %s", err, out)
+		}
 	}
 
 	if out, err := RunVBoxManage("storagectl", cfg.VMName,

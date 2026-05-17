@@ -73,9 +73,45 @@ SQL
 
 systemctl enable mariadb || true
 echo "[install] mariadb install complete"
+
+# phpMyAdmin stack: Apache + PHP + the package itself. debconf answers below
+# are pre-seeded so the install is fully unattended (no Apache picker, no
+# dbconfig-common DB bootstrap — phpMyAdmin will talk to the local mariadb
+# as root via the password baked above).
+echo "[install] installing apache2 + php + phpmyadmin"
+apt-get install -y apache2 php php-mysql php-mbstring php-zip php-gd php-curl php-xml php-json libapache2-mod-php
+
+debconf-set-selections <<'DEBCONF'
+phpmyadmin phpmyadmin/dbconfig-install boolean false
+phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2
+phpmyadmin phpmyadmin/mysql/admin-user string root
+phpmyadmin phpmyadmin/mysql/admin-pass password %s
+phpmyadmin phpmyadmin/app-password-confirm password %s
+phpmyadmin phpmyadmin/mysql/app-pass password %s
+DEBCONF
+
+apt-get install -y phpmyadmin
+
+# Some Debian builds ship the apache snippet but do not enable it; guarantee
+# both the conf and the rewrite module are active so /phpmyadmin resolves.
+if [ -f /etc/phpmyadmin/apache.conf ] && [ ! -e /etc/apache2/conf-enabled/phpmyadmin.conf ]; then
+    ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-enabled/phpmyadmin.conf
+fi
+a2enmod rewrite || true
+a2enconf phpmyadmin || true
+
+# Allow phpMyAdmin to be reached over plain HTTP from anywhere on the
+# host-only subnet (no public exposure: VBox host-only network is isolated).
+systemctl enable apache2 || true
+systemctl restart apache2 || service apache2 restart
+
+echo "[install] phpmyadmin ready at http://<host>/phpmyadmin"
 `,
 		natBringUpScript(),
 		sshAuthorizedKeyScript(cfg),
+		sqlSingleQuoteEscape(cfg.DBRootPassword),
+		sqlSingleQuoteEscape(cfg.DBRootPassword),
+		sqlSingleQuoteEscape(cfg.DBRootPassword),
 		sqlSingleQuoteEscape(cfg.DBRootPassword),
 	)
 
